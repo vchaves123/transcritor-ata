@@ -12,8 +12,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class AnthropicMinutesStructurerTest {
@@ -59,6 +62,35 @@ class AnthropicMinutesStructurerTest {
         StructuredMinutes result = structurer.structure("transcrição");
 
         assertEquals("ok", result.executiveSummary());
+    }
+
+    @Test
+    void summarizesEachChunkBeforeReducingLongTranscripts() throws Exception {
+        String chunkSummary = "Resumo de um trecho da reunião.";
+        String finalJson = """
+                {"executiveSummary": "consolidado", "participants": [], "agenda": [], "decisions": [], "actionItems": []}
+                """;
+
+        AnthropicClient client = mock(AnthropicClient.class);
+        MessageService messageService = mock(MessageService.class);
+        when(client.messages()).thenReturn(messageService);
+
+        int chunkLimit = 100;
+        String longTranscript = "Esta é uma frase de exemplo repetida para simular uma reunião longa. ".repeat(20);
+        int chunkCount = TextChunker.split(longTranscript, chunkLimit).size();
+        assertTrue(chunkCount > 1, "o texto de teste deve gerar mais de um bloco");
+
+        // uma chamada de resumo (map) por bloco, seguida de uma chamada final de estruturacao (reduce)
+        when(messageService.create(any(MessageCreateParams.class))).thenAnswer(invocation -> {
+            long callsSoFar = org.mockito.Mockito.mockingDetails(messageService).getInvocations().size();
+            return callsSoFar <= chunkCount ? fakeMessage(chunkSummary) : fakeMessage(finalJson);
+        });
+
+        AnthropicMinutesStructurer structurer = new AnthropicMinutesStructurer(client, "claude-sonnet-4-6", chunkLimit);
+        StructuredMinutes result = structurer.structure(longTranscript);
+
+        assertEquals("consolidado", result.executiveSummary());
+        verify(messageService, times(chunkCount + 1)).create(any(MessageCreateParams.class));
     }
 
     @Test
