@@ -45,6 +45,10 @@ public final class DocxMinutesGenerator {
         this.companyName = companyName == null ? "" : companyName;
     }
 
+    public String companyNameForDisplay() {
+        return companyName;
+    }
+
     /** Generates the plain minutes: title, metadata table, and the transcription as timestamped paragraphs. */
     public void generateSimpleMinutes(Path outputPath, MeetingMetadata metadata, List<Segment> segments)
             throws IOException {
