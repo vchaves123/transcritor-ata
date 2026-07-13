@@ -20,7 +20,7 @@
     <jackson.version>2.17.2</jackson.version>
     <slf4j.version>2.0.16</slf4j.version>
     <vosk.version>0.3.45</vosk.version>
-    <anthropic.version>0.10.0</anthropic.version>
+    <anthropic.version>2.48.0</anthropic.version>
     <junit.version>5.10.3</junit.version>
     <main.class>com.tailor.transcritorata.gui.MainApp</main.class>
   </properties>
@@ -55,7 +55,7 @@
     <!-- SDK oficial da Anthropic (estruturacao de ata via Claude) -->
     <dependency>
       <groupId>com.anthropic</groupId>
-      <artifactId>anthropic-sdk-java</artifactId>
+      <artifactId>anthropic-java</artifactId>
       <version>${anthropic.version}</version>
     </dependency>
 
