@@ -1,0 +1,32 @@
+# Build
+target/
+
+# Eclipse
+.project
+.classpath
+.settings/
+bin/
+
+# IntelliJ (por precaucao)
+.idea/
+*.iml
+
+# Logs
+logs/
+*.log
+
+# Modelos (grandes, nao versionar)
+*.bin
+models/
+vosk-model*/
+
+# Arquivos temporarios
+*.tmp
+*.wav
+
+# Configuracao local do usuario (pode conter chave de API)
+config.properties
+
+# SO
+Thumbs.db
+.DS_Store

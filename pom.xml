@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.tailor</groupId>
+  <artifactId>transcritor-ata</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <name>transcritor-ata</name>
+  <description>Aplicacao desktop para transcricao de gravacoes de reunioes e geracao de atas em .docx</description>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <swt.version>3.126.0</swt.version>
+    <poi.version>5.3.0</poi.version>
+    <jackson.version>2.17.2</jackson.version>
+    <slf4j.version>2.0.16</slf4j.version>
+    <vosk.version>0.3.45</vosk.version>
+    <anthropic.version>0.10.0</anthropic.version>
+    <junit.version>5.10.3</junit.version>
+    <main.class>com.tailor.transcritorata.gui.MainApp</main.class>
+  </properties>
+
+  <dependencies>
+    <!-- POI para geracao de .docx -->
+    <dependency>
+      <groupId>org.apache.poi</groupId>
+      <artifactId>poi-ooxml</artifactId>
+      <version>${poi.version}</version>
+    </dependency>
+
+    <!-- Jackson para parse de JSON (whisper.cpp e resposta do Claude) -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.datatype</groupId>
+      <artifactId>jackson-datatype-jsr310</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+
+    <!-- Vosk (motor de transcricao offline alternativo) -->
+    <dependency>
+      <groupId>com.alphacephei</groupId>
+      <artifactId>vosk</artifactId>
+      <version>${vosk.version}</version>
+    </dependency>
+
+    <!-- SDK oficial da Anthropic (estruturacao de ata via Claude) -->
+    <dependency>
+      <groupId>com.anthropic</groupId>
+      <artifactId>anthropic-sdk-java</artifactId>
+      <version>${anthropic.version}</version>
+    </dependency>
+
+    <!-- Logging -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>${slf4j.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>${slf4j.version}</version>
+    </dependency>
+
+    <!-- Testes -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <version>5.12.0</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <!-- SWT e um jar especifico por plataforma. Perfis ativados por SO,
+       com Windows x86_64 como padrao (plataforma-alvo principal). -->
+  <profiles>
+    <profile>
+      <id>swt-windows</id>
+      <activation>
+        <os>
+          <family>windows</family>
+        </os>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>org.eclipse.platform</groupId>
+          <artifactId>org.eclipse.swt.win32.win32.x86_64</artifactId>
+          <version>${swt.version}</version>
+        </dependency>
+      </dependencies>
+    </profile>
+
+    <profile>
+      <id>swt-linux</id>
+      <activation>
+        <os>
+          <family>unix</family>
+          <name>linux</name>
+        </os>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>org.eclipse.platform</groupId>
+          <artifactId>org.eclipse.swt.gtk.linux.x86_64</artifactId>
+          <version>${swt.version}</version>
+        </dependency>
+      </dependencies>
+    </profile>
+
+    <profile>
+      <id>swt-mac</id>
+      <activation>
+        <os>
+          <family>mac</family>
+        </os>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>org.eclipse.platform</groupId>
+          <artifactId>org.eclipse.swt.cocoa.macosx.x86_64</artifactId>
+          <version>${swt.version}</version>
+        </dependency>
+      </dependencies>
+    </profile>
+  </profiles>
+
+  <build>
+    <finalName>${project.artifactId}</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.13.0</version>
+        <configuration>
+          <release>${maven.compiler.release}</release>
+          <compilerArgs>
+            <arg>-Xlint:all</arg>
+          </compilerArgs>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.3.1</version>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.6.0</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>${main.class}</mainClass>
+                </transformer>
+              </transformers>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>module-info.class</exclude>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
