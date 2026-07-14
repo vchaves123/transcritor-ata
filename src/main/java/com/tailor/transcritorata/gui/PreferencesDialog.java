@@ -70,6 +70,8 @@ final class PreferencesDialog {
         hintData.widthHint = 480;
         apiKeyHint.setLayoutData(hintData);
 
+        boolean[] saved = { false };
+
         Button save = new Button(dialog, SWT.PUSH);
         save.setText("Salvar");
         GridData saveData = new GridData(SWT.END, SWT.CENTER, true, false);
@@ -102,7 +104,7 @@ final class PreferencesDialog {
                 }
 
                 config.save();
-                dialog.setData("saved", Boolean.TRUE);
+                saved[0] = true;
                 dialog.close();
             }
         });
@@ -117,7 +119,7 @@ final class PreferencesDialog {
                 display.sleep();
             }
         }
-        return Boolean.TRUE.equals(dialog.getData("saved"));
+        return saved[0];
     }
 
     private static boolean confirmPrivacy(Shell parent) {
