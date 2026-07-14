@@ -9,6 +9,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.tailor.transcritorata.config.AppConfig;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
@@ -41,6 +42,22 @@ class DependencyCheckerTest {
 
         DependencyChecker checker = new DependencyChecker(config, locator);
         assertTrue(checker.checkFfmpeg().ok());
+    }
+
+    @Test
+    void acceptsBundledFfmpegPathWithoutTouchingPath(@TempDir Path tempDir) {
+        AppConfig config = new AppConfig(tempDir.resolve("config.properties"));
+        Path bundled = Path.of("tools/ffmpeg/bin/ffmpeg.exe");
+        config.set(AppConfig.KEY_FFMPEG_BINARY, bundled.toString());
+
+        ExecutableLocator locator = mock(ExecutableLocator.class);
+        when(locator.exists(bundled)).thenReturn(true);
+
+        DependencyChecker checker = new DependencyChecker(config, locator);
+        DependencyStatus status = checker.checkFfmpeg();
+
+        assertTrue(status.ok());
+        assertEquals(bundled.toString(), status.detail());
     }
 
     @Test

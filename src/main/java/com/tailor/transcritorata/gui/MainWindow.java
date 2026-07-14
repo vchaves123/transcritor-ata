@@ -421,7 +421,7 @@ public final class MainWindow {
     }
 
     private String resolveFfmpegExecutable() {
-        return "ffmpeg";
+        return config.get(AppConfig.KEY_FFMPEG_BINARY, "ffmpeg");
     }
 
     private void appendLog(String message) {

@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import org.eclipse.swt.widgets.Display;
 
 import com.tailor.transcritorata.config.AppConfig;
+import com.tailor.transcritorata.deps.BundledFfmpegSelector;
 import com.tailor.transcritorata.deps.ExecutableLocator;
 import com.tailor.transcritorata.deps.GpuDetector;
 import com.tailor.transcritorata.deps.WhisperVariantSelector;
@@ -34,6 +35,7 @@ public final class MainApp {
             AppConfig config = new AppConfig();
 
             ExecutableLocator locator = new ExecutableLocator.Default();
+            BundledFfmpegSelector.applyIfBundlePresent(config, locator);
             WhisperVariantSelector.applyBestVariant(config, new GpuDetector(locator), locator);
 
             MainWindow window = new MainWindow(display, config);

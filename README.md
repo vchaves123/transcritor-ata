@@ -39,6 +39,12 @@ Alternativa: baixe em https://www.gyan.dev/ffmpeg/builds/ e adicione a pasta `bi
 > Após instalar pelo winget, feche e reabra o transcritor-ata para que o PATH atualizado seja
 > reconhecido.
 
+**Alternativa "empacotada"**: se você extrair um build estático do ffmpeg para Windows (ex.:
+https://github.com/BtbN/FFmpeg-Builds/releases, asset `*-win64-lgpl.zip`) em `tools/ffmpeg/` na
+raiz do projeto, de forma que o executável fique em `tools/ffmpeg/bin/ffmpeg.exe`, a aplicação
+detecta e usa esse caminho automaticamente a cada inicialização — sem precisar mexer no PATH do
+sistema. Essa pasta fica fora do controle de versão (`.gitignore`).
+
 ### 2. whisper.cpp (motor de transcrição recomendado)
 
 Baixe o binário pré-compilado para Windows nas releases oficiais:

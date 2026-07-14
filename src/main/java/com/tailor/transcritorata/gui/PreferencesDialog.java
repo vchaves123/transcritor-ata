@@ -31,6 +31,9 @@ final class PreferencesDialog {
         Text companyNameText = row(dialog, "Nome da empresa (cabeçalho da ata)",
                 config.get(AppConfig.KEY_COMPANY_NAME, ""), null);
 
+        Text ffmpegBinaryText = row(dialog, "Executável ffmpeg.exe",
+                config.get(AppConfig.KEY_FFMPEG_BINARY, "ffmpeg"), browseFile(dialog, "*.exe"));
+
         Text whisperBinaryText = row(dialog, "Executável whisper-cli.exe",
                 config.get(AppConfig.KEY_WHISPER_BINARY, ""), browseFile(dialog, "*.exe"));
 
@@ -84,6 +87,7 @@ final class PreferencesDialog {
             @Override
             public void widgetSelected(SelectionEvent e) {
                 config.set(AppConfig.KEY_COMPANY_NAME, companyNameText.getText().trim());
+                config.set(AppConfig.KEY_FFMPEG_BINARY, ffmpegBinaryText.getText().trim());
                 config.set(AppConfig.KEY_WHISPER_BINARY, whisperBinaryText.getText().trim());
                 config.set(AppConfig.KEY_WHISPER_MODEL, whisperModelText.getText().trim());
                 config.set(AppConfig.KEY_VOSK_MODEL_DIR, voskModelDirText.getText().trim());

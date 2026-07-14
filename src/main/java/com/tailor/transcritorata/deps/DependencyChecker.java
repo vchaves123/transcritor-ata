@@ -45,11 +45,16 @@ public final class DependencyChecker {
     }
 
     public DependencyStatus checkFfmpeg() {
+        String configured = config.get(AppConfig.KEY_FFMPEG_BINARY, "ffmpeg");
+        if (!"ffmpeg".equals(configured) && locator.exists(Path.of(configured))) {
+            return new DependencyStatus("ffmpeg", true, configured, null, null);
+        }
+
         List<Path> candidates = List.of(Path.of("C:\\ffmpeg\\bin"));
         Optional<Path> found = locator.findOnPathOrCandidates("ffmpeg.exe", candidates);
         List<String> command = found.isPresent()
                 ? List.of(found.get().toString(), "-version")
-                : List.of("ffmpeg", "-version");
+                : List.of(configured, "-version");
         boolean ok = locator.canRun(command, PROBE_TIMEOUT_SECONDS);
 
         if (ok) {

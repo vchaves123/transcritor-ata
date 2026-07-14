@@ -23,6 +23,7 @@ public final class AppConfig {
     private static final String FILE_NAME = "config.properties";
 
     public static final String KEY_ENGINE = "engine";
+    public static final String KEY_FFMPEG_BINARY = "ffmpeg.binary";
     public static final String KEY_WHISPER_BINARY = "whisper.binary";
     public static final String KEY_WHISPER_MODEL = "whisper.model";
     public static final String KEY_VOSK_MODEL_DIR = "vosk.modelDir";
@@ -78,6 +79,7 @@ public final class AppConfig {
 
     private void applyDefaults() {
         properties.putIfAbsent(KEY_ENGINE, "whisper");
+        properties.putIfAbsent(KEY_FFMPEG_BINARY, "ffmpeg");
         properties.putIfAbsent(KEY_CHUNK_MINUTES, "20");
         properties.putIfAbsent(KEY_CHUNK_ENABLED, "false");
         properties.putIfAbsent(KEY_PROCESS_TIMEOUT_SECONDS, "3600");
