@@ -42,6 +42,12 @@ New-Item -ItemType Directory -Path $StagingDir | Out-Null
 Copy-Item (Join-Path $ProjectRoot "target\transcritor-ata.jar") $StagingDir
 
 Write-Host "== 3/5: Gerando app-image portavel com jpackage ==" -ForegroundColor Cyan
+# --java-options -XX:TieredStopAtLevel=1: desativa o compilador JIT C2. Contornamos com isso um
+# crash nativo da JVM (EXCEPTION_ACCESS_VIOLATION dentro do proprio jvm.dll, na thread
+# "C2 CompilerThread", compilando metodos completamente alheios ao nosso codigo) observado em
+# CPUs hibridas mais novas da Intel com o Temurin 21.0.11 -- um bug do JIT, nao da aplicacao.
+# Perde-se um pouco de performance de pico (fica so com o compilador C1), troca aceitavel por
+# estabilidade para usuarios finais nao tecnicos.
 & jpackage `
     --type app-image `
     --input $StagingDir `
@@ -50,6 +56,7 @@ Write-Host "== 3/5: Gerando app-image portavel com jpackage ==" -ForegroundColor
     --name $AppName `
     --app-version $Version `
     --vendor "Tailor" `
+    --java-options "-XX:TieredStopAtLevel=1" `
     --dest $ReleaseDir
 if ($LASTEXITCODE -ne 0) { throw "jpackage falhou." }
 
