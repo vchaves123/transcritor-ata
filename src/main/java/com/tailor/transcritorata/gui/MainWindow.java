@@ -262,7 +262,12 @@ public final class MainWindow {
         ProcessRunner.Handle handle = new ProcessRunner.Handle();
         currentHandle = handle;
 
-        Thread.ofVirtual().start(() -> runPipeline(handle));
+        // Lê o estado dos widgets aqui, na UI thread — a thread de fundo não pode tocar em
+        // widgets SWT (dispararia SWTException: Invalid thread access).
+        boolean useVosk = engineCombo.getSelectionIndex() == 1;
+        boolean aiEnabled = aiCheckbox.getEnabled() && aiCheckbox.getSelection();
+
+        Thread.ofVirtual().start(() -> runPipeline(handle, useVosk, aiEnabled));
     }
 
     private void cancelTranscription() {
@@ -273,9 +278,9 @@ public final class MainWindow {
         appendLog("Cancelando...");
     }
 
-    private void runPipeline(ProcessRunner.Handle handle) {
+    private void runPipeline(ProcessRunner.Handle handle, boolean useVosk, boolean aiEnabled) {
         try {
-            TranscriptionPipeline pipeline = buildPipeline();
+            TranscriptionPipeline pipeline = buildPipeline(useVosk, aiEnabled);
             Path outputDir = selectedVideo.getParent();
             PipelineResult result = pipeline.run(selectedVideo, outputDir,
                     (message, percent) -> display.asyncExec(() -> {
@@ -317,11 +322,10 @@ public final class MainWindow {
         ErrorDialog.show(shell, friendlyMessage, details);
     }
 
-    private TranscriptionPipeline buildPipeline() throws Exception {
+    private TranscriptionPipeline buildPipeline(boolean useVosk, boolean aiEnabled) throws Exception {
         long timeout = config.getInt(AppConfig.KEY_PROCESS_TIMEOUT_SECONDS, (int) DEFAULT_TIMEOUT_SECONDS);
         AudioExtractor audioExtractor = new AudioExtractor(resolveFfmpegExecutable(), timeout);
 
-        boolean useVosk = engineCombo.getSelectionIndex() == 1;
         TranscriptionEngine engine = useVosk
                 ? new VoskEngine(Path.of(config.get(AppConfig.KEY_VOSK_MODEL_DIR, "")))
                 : new WhisperCppEngine(config.get(AppConfig.KEY_WHISPER_BINARY, "whisper-cli"),
@@ -329,7 +333,6 @@ public final class MainWindow {
 
         DocxMinutesGenerator generator = new DocxMinutesGenerator(config.get(AppConfig.KEY_COMPANY_NAME, ""));
 
-        boolean aiEnabled = aiCheckbox.getEnabled() && aiCheckbox.getSelection();
         MinutesStructurer structurer = null;
         if (aiEnabled) {
             AnthropicClient client = AnthropicOkHttpClient.builder()
