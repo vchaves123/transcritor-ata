@@ -20,6 +20,9 @@ logs/
 models/
 vosk-model*/
 
+# Ferramentas de terceiros baixadas localmente (LIUM_SpkDiarization, etc.)
+tools/
+
 # Arquivos temporarios
 *.tmp
 *.wav
