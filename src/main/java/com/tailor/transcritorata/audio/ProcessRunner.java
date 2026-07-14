@@ -45,7 +45,11 @@ public final class ProcessRunner {
     public static void run(List<String> command, Handle handle, long timeoutSeconds,
             Consumer<String> lineConsumer) throws ExternalProcessException {
         StringBuilder output = new StringBuilder();
-        LOG.debug("Executando comando externo: {}", command);
+        String commandLine = formatCommandLine(command);
+        LOG.debug("Executando comando externo: {}", commandLine);
+        if (lineConsumer != null) {
+            lineConsumer.accept(">> " + commandLine);
+        }
         try {
             ProcessBuilder builder = new ProcessBuilder(command);
             builder.redirectErrorStream(true);
@@ -83,5 +87,21 @@ public final class ProcessRunner {
             Thread.currentThread().interrupt();
             throw new ExternalProcessException("A execução foi cancelada.", output.toString());
         }
+    }
+
+    /** Renders a command list as a single readable line, quoting arguments that contain spaces. */
+    static String formatCommandLine(List<String> command) {
+        StringBuilder line = new StringBuilder();
+        for (String arg : command) {
+            if (!line.isEmpty()) {
+                line.append(' ');
+            }
+            if (arg.isEmpty() || arg.indexOf(' ') >= 0) {
+                line.append('"').append(arg).append('"');
+            } else {
+                line.append(arg);
+            }
+        }
+        return line.toString();
     }
 }
