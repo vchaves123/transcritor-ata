@@ -65,7 +65,13 @@ comportamento automático, ou configure manualmente um único caminho fixo nas p
 
 ### 3. Um modelo Whisper (`.bin`)
 
-Baixe em: https://huggingface.co/ggerganov/whisper.cpp/tree/main
+**Não precisa baixar manualmente**: na primeira vez que a aplicação abrir sem um modelo válido
+configurado, aparece um diálogo oferecendo três opções (pequeno, médio — recomendado, ou grande),
+com tamanho aproximado e descrição de cada um. Ao escolher e clicar em "Baixar", o modelo é
+baixado automaticamente para `tools/models/` e as preferências são ajustadas sozinhas. Dá para
+"Pular por agora" e configurar manualmente depois.
+
+Se preferir baixar você mesmo: https://huggingface.co/ggerganov/whisper.cpp/tree/main
 
 - `ggml-medium.bin` — recomendado, bom equilíbrio para uso em CPU.
 - `ggml-small.bin` — para máquinas mais modestas.
