@@ -36,6 +36,9 @@ public final class AppConfig {
     public static final String KEY_AI_API_KEY = "ai.apiKey";
     public static final String KEY_AI_PRIVACY_CONSENT = "ai.privacyConsentGiven";
     public static final String KEY_AI_CHUNK_CHAR_LIMIT = "ai.chunkCharLimit";
+    public static final String KEY_DIARIZATION_ENABLED = "diarization.enabled";
+    public static final String KEY_DIARIZATION_JAR = "diarization.liumJar";
+    public static final String KEY_DIARIZATION_JAVA = "diarization.javaExecutable";
 
     private final Properties properties = new Properties();
     private final Path configFile;
@@ -83,6 +86,8 @@ public final class AppConfig {
         properties.putIfAbsent(KEY_AI_PRIVACY_CONSENT, "false");
         properties.putIfAbsent(KEY_AI_CHUNK_CHAR_LIMIT, "12000");
         properties.putIfAbsent(KEY_COMPANY_NAME, "");
+        properties.putIfAbsent(KEY_DIARIZATION_ENABLED, "false");
+        properties.putIfAbsent(KEY_DIARIZATION_JAVA, "java");
     }
 
     public void save() {

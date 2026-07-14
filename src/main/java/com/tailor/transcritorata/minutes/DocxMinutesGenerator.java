@@ -20,6 +20,7 @@ import org.openxmlformats.schemas.wordprocessingml.x2006.main.STFldCharType;
 
 import com.tailor.transcritorata.ai.ActionItem;
 import com.tailor.transcritorata.ai.StructuredMinutes;
+import com.tailor.transcritorata.model.AttributedSegment;
 import com.tailor.transcritorata.model.Segment;
 
 /**
@@ -52,6 +53,12 @@ public final class DocxMinutesGenerator {
     /** Generates the plain minutes: title, metadata table, and the transcription as timestamped paragraphs. */
     public void generateSimpleMinutes(Path outputPath, MeetingMetadata metadata, List<Segment> segments)
             throws IOException {
+        generateSimpleMinutesAttributed(outputPath, metadata, withoutSpeakers(segments));
+    }
+
+    /** Same as {@link #generateSimpleMinutes} but with speaker-attributed segments. */
+    public void generateSimpleMinutesAttributed(Path outputPath, MeetingMetadata metadata,
+            List<AttributedSegment> segments) throws IOException {
         try (XWPFDocument document = new XWPFDocument()) {
             applyHeaderFooter(document);
             addTitle(document, "Ata de Reunião");
@@ -68,6 +75,12 @@ public final class DocxMinutesGenerator {
      */
     public void generateStructuredMinutes(Path outputPath, MeetingMetadata metadata, StructuredMinutes structured,
             List<Segment> segments) throws IOException {
+        generateStructuredMinutesAttributed(outputPath, metadata, structured, withoutSpeakers(segments));
+    }
+
+    /** Same as {@link #generateStructuredMinutes} but with speaker-attributed segments. */
+    public void generateStructuredMinutesAttributed(Path outputPath, MeetingMetadata metadata,
+            StructuredMinutes structured, List<AttributedSegment> segments) throws IOException {
         try (XWPFDocument document = new XWPFDocument()) {
             applyHeaderFooter(document);
             addTitle(document, "Ata de Reunião Estruturada");
@@ -247,10 +260,20 @@ public final class DocxMinutesGenerator {
         cell.setColor(ACCENT_COLOR);
     }
 
-    private void addTranscription(XWPFDocument document, List<Segment> segments) {
-        for (Segment segment : segments) {
+    private void addTranscription(XWPFDocument document, List<AttributedSegment> segments) {
+        for (AttributedSegment attributed : segments) {
+            Segment segment = attributed.segment();
             XWPFParagraph paragraph = document.createParagraph();
             paragraph.setSpacingAfter(120);
+
+            if (attributed.hasSpeaker()) {
+                XWPFRun speakerRun = paragraph.createRun();
+                speakerRun.setText(attributed.speakerLabel() + " ");
+                speakerRun.setBold(true);
+                speakerRun.setColor(ACCENT_COLOR);
+                speakerRun.setFontFamily(FONT_FAMILY);
+                speakerRun.setFontSize(BODY_SIZE);
+            }
 
             XWPFRun timestampRun = paragraph.createRun();
             timestampRun.setText("[" + segment.formattedStart() + "] ");
@@ -263,6 +286,10 @@ public final class DocxMinutesGenerator {
             textRun.setFontFamily(FONT_FAMILY);
             textRun.setFontSize(BODY_SIZE);
         }
+    }
+
+    private static List<AttributedSegment> withoutSpeakers(List<Segment> segments) {
+        return segments.stream().map(s -> new AttributedSegment(s, null)).toList();
     }
 
     private void write(XWPFDocument document, Path outputPath) throws IOException {

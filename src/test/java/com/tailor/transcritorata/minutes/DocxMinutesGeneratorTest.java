@@ -14,6 +14,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.tailor.transcritorata.ai.ActionItem;
 import com.tailor.transcritorata.ai.StructuredMinutes;
+import com.tailor.transcritorata.model.AttributedSegment;
 import com.tailor.transcritorata.model.Segment;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -75,6 +76,23 @@ class DocxMinutesGeneratorTest {
             assertEquals("Atualizar cronograma", actionTable.getRow(1).getCell(0).getText());
             assertEquals("Maria", actionTable.getRow(1).getCell(1).getText());
             assertEquals("2026-07-20", actionTable.getRow(1).getCell(2).getText());
+        }
+    }
+
+    @Test
+    void includesSpeakerLabelsWhenSegmentsAreAttributed(@TempDir Path tempDir) throws IOException {
+        List<AttributedSegment> attributed = List.of(
+                new AttributedSegment(SEGMENTS.get(0), "Pessoa 1"),
+                new AttributedSegment(SEGMENTS.get(1), "Pessoa 2"));
+
+        Path output = tempDir.resolve("ata-locutores.docx");
+        new DocxMinutesGenerator("Tailor").generateSimpleMinutesAttributed(output, METADATA, attributed);
+
+        try (XWPFDocument document = new XWPFDocument(java.nio.file.Files.newInputStream(output))) {
+            String fullText = extractText(document);
+            assertTrue(fullText.contains("Pessoa 1"), "deve conter o rótulo do primeiro locutor");
+            assertTrue(fullText.contains("Pessoa 2"), "deve conter o rótulo do segundo locutor");
+            assertTrue(fullText.contains("Bom dia a todos."));
         }
     }
 

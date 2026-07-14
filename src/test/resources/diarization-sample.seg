@@ -1,0 +1,6 @@
+;; cluster S0
+reuniao 1 0 500 M S U S0
+reuniao 1 700 300 M S U S0
+;; cluster S1
+reuniao 1 500 200 F S U S1
+reuniao 1 1000 450 F S U S1

@@ -8,6 +8,13 @@ package com.tailor.transcritorata.deps;
  * @param detail         short detail shown next to the status (e.g. resolved path or version)
  * @param instructions   Portuguese, human-readable installation instructions, shown only when {@code !ok}
  * @param helpUrl        optional link with more information (may be {@code null})
+ * @param optional       when {@code true}, this dependency being missing must not block transcription
  */
-public record DependencyStatus(String name, boolean ok, String detail, String instructions, String helpUrl) {
+public record DependencyStatus(String name, boolean ok, String detail, String instructions, String helpUrl,
+        boolean optional) {
+
+    /** Convenience constructor for required dependencies ({@code optional = false}). */
+    public DependencyStatus(String name, boolean ok, String detail, String instructions, String helpUrl) {
+        this(name, ok, detail, instructions, helpUrl, false);
+    }
 }

@@ -207,7 +207,8 @@ public final class MainWindow {
         Thread.ofVirtual().start(() -> {
             DependencyChecker checker = new DependencyChecker(config);
             List<DependencyStatus> statuses = checker.checkAll();
-            boolean allOk = statuses.stream().allMatch(DependencyStatus::ok);
+            // Dependências opcionais (ex.: diarização) não bloqueiam a transcrição.
+            boolean allOk = statuses.stream().filter(s -> !s.optional()).allMatch(DependencyStatus::ok);
             display.asyncExec(() -> {
                 if (!shell.isDisposed()) {
                     transcribeButton.setEnabled(allOk && selectedVideo != null);
