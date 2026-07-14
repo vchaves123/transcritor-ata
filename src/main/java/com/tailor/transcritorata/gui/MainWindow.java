@@ -1,5 +1,6 @@
 package com.tailor.transcritorata.gui;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -35,6 +36,7 @@ import com.tailor.transcritorata.diarization.SpeakerDiarizer;
 import com.tailor.transcritorata.deps.DependencyChecker;
 import com.tailor.transcritorata.deps.DependencyStatus;
 import com.tailor.transcritorata.minutes.DocxMinutesGenerator;
+import com.tailor.transcritorata.transcription.CudaFallbackTranscriptionEngine;
 import com.tailor.transcritorata.transcription.PipelineResult;
 import com.tailor.transcritorata.transcription.TranscriptionEngine;
 import com.tailor.transcritorata.transcription.TranscriptionPipeline;
@@ -392,8 +394,7 @@ public final class MainWindow {
 
         TranscriptionEngine engine = useVosk
                 ? new VoskEngine(Path.of(config.get(AppConfig.KEY_VOSK_MODEL_DIR, "")))
-                : new WhisperCppEngine(config.get(AppConfig.KEY_WHISPER_BINARY, "whisper-cli"),
-                        Path.of(config.get(AppConfig.KEY_WHISPER_MODEL, "")), "pt", timeout);
+                : buildWhisperEngine(timeout);
 
         DocxMinutesGenerator generator = new DocxMinutesGenerator(config.get(AppConfig.KEY_COMPANY_NAME, ""));
 
@@ -422,6 +423,27 @@ public final class MainWindow {
 
     private String resolveFfmpegExecutable() {
         return config.get(AppConfig.KEY_FFMPEG_BINARY, "ffmpeg");
+    }
+
+    /**
+     * Builds the Whisper engine, transparently wrapped with a CPU fallback when the configured
+     * binary is the bundled CUDA build: some GPUs (2 GB VRAM cards are common on budget/older
+     * laptops) run out of memory partway through long recordings even though the model loaded
+     * fine, and restarting on CPU is far friendlier than surfacing a raw CUDA error.
+     */
+    private TranscriptionEngine buildWhisperEngine(long timeout) {
+        String configuredBinary = config.get(AppConfig.KEY_WHISPER_BINARY, "whisper-cli");
+        Path modelPath = Path.of(config.get(AppConfig.KEY_WHISPER_MODEL, ""));
+        TranscriptionEngine primary = new WhisperCppEngine(configuredBinary, modelPath, "pt", timeout);
+
+        Path cpuBinary = Path.of("tools", "whisper-cpu", "Release", "whisper-cli.exe");
+        boolean alreadyOnCpuBuild = Path.of(configuredBinary).equals(cpuBinary);
+        if (alreadyOnCpuBuild || !Files.isRegularFile(cpuBinary)) {
+            return primary;
+        }
+
+        TranscriptionEngine cpuFallback = new WhisperCppEngine(cpuBinary.toString(), modelPath, "pt", timeout);
+        return new CudaFallbackTranscriptionEngine(primary, cpuFallback);
     }
 
     private void appendLog(String message) {
