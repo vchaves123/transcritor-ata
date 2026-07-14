@@ -151,7 +151,7 @@ final class ModelSetupDialog {
             String closeButtonLabel, Button[] radios, AtomicBoolean cancelled, AtomicBoolean downloading) {
         try {
             Path targetDir = Path.of(MODELS_DIR);
-            Path downloaded = new WhisperModelDownloader().download(chosen, targetDir,
+            new WhisperModelDownloader().download(chosen, targetDir,
                     (done, total) -> display.asyncExec(() -> {
                         if (dialog.isDisposed()) {
                             return;
