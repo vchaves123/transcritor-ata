@@ -448,7 +448,8 @@ public final class MainWindow {
     private TranscriptionEngine buildWhisperEngine(long timeout) {
         String configuredBinary = config.get(AppConfig.KEY_WHISPER_BINARY, "whisper-cli");
         Path modelPath = Path.of(config.get(AppConfig.KEY_WHISPER_MODEL, ""));
-        TranscriptionEngine primary = new WhisperCppEngine(configuredBinary, modelPath, "pt", timeout);
+        boolean fastMode = config.getBoolean(AppConfig.KEY_WHISPER_FAST_MODE, false);
+        TranscriptionEngine primary = new WhisperCppEngine(configuredBinary, modelPath, "pt", timeout, fastMode);
 
         Path cpuBinary = Path.of("tools", "whisper-cpu", "Release", "whisper-cli.exe");
         boolean alreadyOnCpuBuild = Path.of(configuredBinary).equals(cpuBinary);
@@ -456,7 +457,8 @@ public final class MainWindow {
             return primary;
         }
 
-        TranscriptionEngine cpuFallback = new WhisperCppEngine(cpuBinary.toString(), modelPath, "pt", timeout);
+        TranscriptionEngine cpuFallback = new WhisperCppEngine(cpuBinary.toString(), modelPath, "pt", timeout,
+                fastMode);
         return new CudaFallbackTranscriptionEngine(primary, cpuFallback);
     }
 

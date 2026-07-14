@@ -11,6 +11,8 @@ import org.junit.jupiter.api.Test;
 import com.tailor.transcritorata.model.Segment;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WhisperCppEngineTest {
 
@@ -32,6 +34,40 @@ class WhisperCppEngineTest {
         assertEquals(Duration.ofMillis(2500), second.start());
         assertEquals(Duration.ofMillis(7120), second.end());
         assertEquals("Hoje vamos discutir o cronograma do projeto.", second.text());
+    }
+
+    @Test
+    void defaultConstructorDoesNotAddBeamSizeFlags() {
+        WhisperCppEngine engine = new WhisperCppEngine("whisper-cli.exe", Path.of("model.bin"), "pt", 60);
+
+        List<String> command = engine.buildCommand(Path.of("audio.wav"), Path.of("saida"), 4);
+
+        assertFalse(command.contains("-bs"), "sem fastMode nao deveria forcar beam-size");
+        assertFalse(command.contains("-bo"), "sem fastMode nao deveria forcar best-of");
+    }
+
+    @Test
+    void fastModeAddsGreedyDecodingFlags() {
+        WhisperCppEngine engine = new WhisperCppEngine("whisper-cli.exe", Path.of("model.bin"), "pt", 60, true);
+
+        List<String> command = engine.buildCommand(Path.of("audio.wav"), Path.of("saida"), 4);
+
+        assertTrue(command.contains("-bs"));
+        assertTrue(command.contains("-bo"));
+        int bsIndex = command.indexOf("-bs");
+        int boIndex = command.indexOf("-bo");
+        assertEquals("1", command.get(bsIndex + 1));
+        assertEquals("1", command.get(boIndex + 1));
+    }
+
+    @Test
+    void explicitFastModeFalseMatchesDefaultConstructor() {
+        WhisperCppEngine engine = new WhisperCppEngine("whisper-cli.exe", Path.of("model.bin"), "pt", 60, false);
+
+        List<String> command = engine.buildCommand(Path.of("audio.wav"), Path.of("saida"), 4);
+
+        assertFalse(command.contains("-bs"));
+        assertFalse(command.contains("-bo"));
     }
 
     private static Path resourcePath(String name) throws URISyntaxException {

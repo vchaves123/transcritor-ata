@@ -63,6 +63,13 @@ inicialização — cuBLAS quando há GPU, CPU quando não há. Essas pastas fic
 versão (`.gitignore`) por serem binários grandes de terceiros; baixe-as você mesmo se quiser esse
 comportamento automático, ou configure manualmente um único caminho fixo nas preferências.
 
+**GPU com pouca VRAM (2 GB ou menos)**: se a transcrição falhar por falta de memória na GPU com
+modelos maiores (`medium`, `large-v3`), marque a opção "Priorizar velocidade e uso de memória da
+GPU" nas Preferências. Ela troca a busca em feixe (beam search, padrão do whisper.cpp) por
+decodificação gulosa, usando bem menos VRAM e sendo mais rápida, ao custo de um pouco de precisão.
+Além disso, o app já tenta automaticamente transcrever de novo usando a CPU se a GPU ficar sem
+memória no meio de uma transcrição.
+
 ### 3. Um modelo Whisper (`.bin`)
 
 **Não precisa baixar manualmente**: na primeira vez que a aplicação abrir sem um modelo válido

@@ -31,13 +31,27 @@ public final class WhisperCppEngine implements TranscriptionEngine {
     private final Path modelPath;
     private final String language;
     private final long timeoutSeconds;
+    private final boolean fastMode;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public WhisperCppEngine(String whisperCliExecutable, Path modelPath, String language, long timeoutSeconds) {
+        this(whisperCliExecutable, modelPath, language, timeoutSeconds, false);
+    }
+
+    /**
+     * @param fastMode when {@code true}, forces greedy decoding ({@code -bs 1 -bo 1}) instead of
+     *                 whisper.cpp's default 5-way beam search. Faster and uses noticeably less
+     *                 GPU memory (the beam search multiplies decoder buffer size by the beam
+     *                 count), at some cost in transcription accuracy — useful for GPUs with
+     *                 little VRAM that would otherwise run out of memory mid-transcription.
+     */
+    public WhisperCppEngine(String whisperCliExecutable, Path modelPath, String language, long timeoutSeconds,
+            boolean fastMode) {
         this.whisperCliExecutable = whisperCliExecutable;
         this.modelPath = modelPath;
         this.language = language;
         this.timeoutSeconds = timeoutSeconds;
+        this.fastMode = fastMode;
     }
 
     @Override
@@ -47,15 +61,9 @@ public final class WhisperCppEngine implements TranscriptionEngine {
         Files.deleteIfExists(outputPrefix);
 
         int threads = Runtime.getRuntime().availableProcessors();
-        List<String> command = List.of(
-                whisperCliExecutable,
-                "-m", modelPath.toString(),
-                "-l", language,
-                "-oj",
-                "-of", outputPrefix.toString(),
-                "-t", Integer.toString(threads),
-                wav.toString());
-        LOG.info("Transcrevendo {} com whisper.cpp (modelo {}, {} threads)", wav, modelPath, threads);
+        List<String> command = buildCommand(wav, outputPrefix, threads);
+        LOG.info("Transcrevendo {} com whisper.cpp (modelo {}, {} threads, fastMode={})",
+                wav, modelPath, threads, fastMode);
 
         try {
             ProcessRunner.run(command, handle, timeoutSeconds, line -> reportProgress(line, listener));
@@ -69,6 +77,21 @@ public final class WhisperCppEngine implements TranscriptionEngine {
         } finally {
             Files.deleteIfExists(Path.of(outputPrefix + ".json"));
         }
+    }
+
+    List<String> buildCommand(Path wav, Path outputPrefix, int threads) {
+        List<String> command = new ArrayList<>(List.of(
+                whisperCliExecutable,
+                "-m", modelPath.toString(),
+                "-l", language,
+                "-oj",
+                "-of", outputPrefix.toString(),
+                "-t", Integer.toString(threads)));
+        if (fastMode) {
+            command.addAll(List.of("-bs", "1", "-bo", "1"));
+        }
+        command.add(wav.toString());
+        return command;
     }
 
     /**

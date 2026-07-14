@@ -67,6 +67,18 @@ final class PreferencesDialog {
         chunkCheckboxData.horizontalSpan = 3;
         chunkEnabledCheckbox.setLayoutData(chunkCheckboxData);
 
+        Button fastModeCheckbox = new Button(dialog, SWT.CHECK);
+        fastModeCheckbox.setText("Priorizar velocidade e uso de memória da GPU (menos preciso)");
+        fastModeCheckbox.setToolTipText(
+                "Usa decodificação gulosa (beam-size 1) em vez do padrão do whisper.cpp (beam-size 5). "
+                        + "Mais rápido e usa bem menos memória de GPU — ajuda a evitar erros de falta de "
+                        + "memória (\"out of memory\") em placas de vídeo com pouca VRAM, ao custo de uma "
+                        + "transcrição um pouco menos precisa.");
+        fastModeCheckbox.setSelection(config.getBoolean(AppConfig.KEY_WHISPER_FAST_MODE, false));
+        GridData fastModeData = new GridData(SWT.FILL, SWT.CENTER, true, false);
+        fastModeData.horizontalSpan = 3;
+        fastModeCheckbox.setLayoutData(fastModeData);
+
         Label separator = new Label(dialog, SWT.SEPARATOR | SWT.HORIZONTAL);
         GridData separatorData = new GridData(SWT.FILL, SWT.CENTER, true, false);
         separatorData.horizontalSpan = 3;
@@ -103,6 +115,7 @@ final class PreferencesDialog {
                 config.set(AppConfig.KEY_WHISPER_MODEL, whisperModelText.getText().trim());
                 config.set(AppConfig.KEY_VOSK_MODEL_DIR, voskModelDirText.getText().trim());
                 config.setBoolean(AppConfig.KEY_CHUNK_ENABLED, chunkEnabledCheckbox.getSelection());
+                config.setBoolean(AppConfig.KEY_WHISPER_FAST_MODE, fastModeCheckbox.getSelection());
                 config.set(AppConfig.KEY_AI_MODEL, aiModelText.getText().trim());
 
                 try {
