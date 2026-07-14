@@ -40,6 +40,7 @@ public final class VoskEngine implements TranscriptionEngine {
     public List<Segment> transcribe(Path wav, ProgressListener listener, ProcessRunner.Handle handle)
             throws ExternalProcessException, IOException {
         List<Segment> segments = new ArrayList<>();
+        LOG.info("Transcrevendo {} com Vosk (modelo em {})", wav, modelDir);
 
         try (Model model = new Model(modelDir.toString());
                 Recognizer recognizer = new Recognizer(model, SAMPLE_RATE)) {

@@ -69,7 +69,6 @@ class DependencyCheckerTest {
         assertTrue(checker.checkWhisperModel().ok());
     }
 
-    @SuppressWarnings("unchecked")
     private static List<String> anyCommand() {
         return org.mockito.ArgumentMatchers.anyList();
     }

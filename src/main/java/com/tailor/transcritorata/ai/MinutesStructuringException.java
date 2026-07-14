@@ -7,6 +7,8 @@ package com.tailor.transcritorata.ai;
  */
 public class MinutesStructuringException extends Exception {
 
+    private static final long serialVersionUID = 1L;
+
     public MinutesStructuringException(String message, Throwable cause) {
         super(message, cause);
     }

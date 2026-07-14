@@ -55,6 +55,7 @@ public final class WhisperCppEngine implements TranscriptionEngine {
                 "-of", outputPrefix.toString(),
                 "-t", Integer.toString(threads),
                 wav.toString());
+        LOG.info("Transcrevendo {} com whisper.cpp (modelo {}, {} threads)", wav, modelPath, threads);
 
         try {
             ProcessRunner.run(command, handle, timeoutSeconds, line -> reportProgress(line, listener));

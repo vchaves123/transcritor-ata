@@ -7,6 +7,8 @@ package com.tailor.transcritorata.audio;
  */
 public class ExternalProcessException extends Exception {
 
+    private static final long serialVersionUID = 1L;
+
     private final String processOutput;
 
     public ExternalProcessException(String message, String processOutput) {
