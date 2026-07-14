@@ -86,35 +86,6 @@ class DependencyCheckerTest {
         assertTrue(checker.checkWhisperModel().ok());
     }
 
-    @Test
-    void diarizationCheckIsOptionalAndMissingByDefault(@TempDir Path tempDir) {
-        AppConfig config = new AppConfig(tempDir.resolve("config.properties"));
-        DependencyChecker checker = new DependencyChecker(config, mock(ExecutableLocator.class));
-
-        DependencyStatus status = checker.checkDiarization();
-
-        assertFalse(status.ok());
-        assertTrue(status.optional(), "diarização deve ser marcada como opcional");
-        assertTrue(status.instructions().contains("lium_spkdiarization"));
-    }
-
-    @Test
-    void acceptsConfiguredLiumJarWhenPresent(@TempDir Path tempDir) {
-        AppConfig config = new AppConfig(tempDir.resolve("config.properties"));
-        Path jarPath = Path.of("C:/tools/lium_spkdiarization-8.4.1.jar");
-        config.set(AppConfig.KEY_DIARIZATION_JAR, jarPath.toString());
-
-        ExecutableLocator locator = mock(ExecutableLocator.class);
-        when(locator.exists(jarPath)).thenReturn(true);
-        when(locator.sizeOf(jarPath)).thenReturn(5L * 1024 * 1024);
-
-        DependencyChecker checker = new DependencyChecker(config, locator);
-        DependencyStatus status = checker.checkDiarization();
-
-        assertTrue(status.ok());
-        assertTrue(status.optional());
-    }
-
     private static List<String> anyCommand() {
         return org.mockito.ArgumentMatchers.anyList();
     }

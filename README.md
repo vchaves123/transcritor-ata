@@ -94,25 +94,19 @@ correspondente das preferências.
 
 ### 6. (Opcional, experimental) Identificação de participantes
 
-Para que a transcrição indique quem falou cada trecho (`Pessoa 1`, `Pessoa 2`, ...), baixe:
+Nenhuma instalação ou download extra é necessário. Basta marcar o checkbox "Identificar
+participantes na transcrição (experimental)" antes de transcrever, para que a ata indique quem
+falou cada trecho (`Pessoa 1`, `Pessoa 2`, ...).
 
-https://git-lium.univ-lemans.fr/Meignier/lium-spkdiarization/-/raw/master/jar/lium_spkdiarization-8.4.1.jar.gz
+Esse recurso roda **inteiramente dentro do próprio programa**, sem nenhum processo externo: é uma
+reimplementação em Java do pipeline neural [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1)
+(segmentação + embeddings de locutor + clustering hierárquico), executada via
+[ONNX Runtime](https://onnxruntime.ai/). Os modelos (~32 MB) já vêm embutidos no jar da aplicação.
 
-O arquivo vem compactado em `.gz` (não é um zip comum) — descompacte-o (ex.: com 7-Zip) para obter
-o `lium_spkdiarization-8.4.1.jar`, salve-o em uma pasta e selecione-o no campo "LIUM_SpkDiarization"
-das preferências. Marque então o checkbox "Identificar participantes na transcrição (experimental)".
-
-O LIUM roda como um processo Java separado. Na versão portável, isso já vem resolvido: o pacote
-inclui um runtime Java dedicado só para essa finalidade (`tools/jre/`, gerado via `jlink`), já que
-o runtime principal do app (empacotado com `jpackage`) não inclui um `java.exe` utilizável — sem
-esse runtime dedicado, a identificação de participantes falharia silenciosamente em qualquer
-máquina sem um JDK instalado separadamente. Se você estiver rodando a partir do código-fonte (não
-da versão portável) e não tiver um JDK/`java` no PATH, aponte manualmente o campo "Java (para
-diarização)" das preferências para um `java.exe` válido.
-
-> A identificação usa a ferramenta clássica LIUM (não neural): a qualidade é limitada e funciona
-> melhor em áudios com poucos participantes e pouca sobreposição de falas. Ela roda em paralelo com
-> a transcrição e, se falhar, a ata é gerada normalmente, apenas sem os rótulos de locutor.
+> É bem mais preciso que a solução anterior baseada no LIUM_SpkDiarization (clássica, não neural),
+> mas ainda é experimental — a precisão pode variar conforme o número de participantes, a
+> qualidade do áudio e a sobreposição de falas. Se falhar, a ata é gerada normalmente, apenas sem
+> os rótulos de locutor.
 
 ## Compilar e executar
 
@@ -138,7 +132,7 @@ em qualquer pasta e executar `transcritor-ata.exe`. Já vem com:
 - ffmpeg.
 - whisper-cli (builds CPU e GPU/CUDA — a aplicação escolhe automaticamente conforme sua placa de
   vídeo, a cada inicialização).
-- LIUM_SpkDiarization (identificação de participantes, opcional).
+- Identificação de participantes (modelos ONNX embutidos no próprio jar, opcional).
 
 **Não vem incluído**: o modelo de transcrição Whisper (`.bin`) — na primeira execução, um diálogo
 deixa você escolher o tamanho e baixa automaticamente.
@@ -147,9 +141,9 @@ Baixe a versão mais recente na aba [Releases](../../releases) deste repositóri
 
 ### Gerando o pacote portável você mesmo
 
-Requer JDK 21 (com `jpackage` no PATH), Maven, e a pasta `tools/` já populada com ffmpeg,
-whisper-cli e o LIUM (veja os pré-requisitos acima — o jeito mais fácil é rodar a própria
-aplicação uma vez, que já baixa/organiza tudo isso automaticamente na estrutura esperada).
+Requer JDK 21 (com `jpackage` no PATH), Maven, e a pasta `tools/` já populada com ffmpeg e
+whisper-cli (veja os pré-requisitos acima — o jeito mais fácil é rodar a própria aplicação uma
+vez, que já baixa/organiza tudo isso automaticamente na estrutura esperada).
 
 ```powershell
 .\package-portable.ps1
@@ -173,7 +167,7 @@ operacional (Windows por padrão).
 - `transcription` — motores de transcrição (Whisper.cpp, Vosk) e o pipeline orquestrador.
 - `minutes` — geração das atas em `.docx` (Apache POI).
 - `ai` — integração opcional com a API da Anthropic para a ata estruturada.
-- `diarization` — identificação opcional de participantes (LIUM_SpkDiarization).
+- `diarization` — identificação opcional de participantes (pipeline neural via ONNX Runtime).
 - `deps` — verificador de dependências.
 - `config` — preferências do usuário.
 
@@ -184,8 +178,8 @@ operacional (Windows por padrão).
 
 ## Limitações conhecidas
 
-- A identificação de participantes (diarização) é opcional e experimental, baseada na ferramenta
-  clássica LIUM — bem menos precisa que soluções neurais modernas. Veja o item 6 dos pré-requisitos.
+- A identificação de participantes (diarização) é opcional e experimental — a precisão pode
+  variar bastante conforme a gravação. Veja o item 6 dos pré-requisitos.
 - Não há instalador (`.msi`/`.exe`); a distribuição é via jar executável.
 - Os estilos da ata são definidos em código (`DocxMinutesGenerator`), sem uso de um template
   `.dotx` corporativo — a classe já foi estruturada para essa evolução futura.

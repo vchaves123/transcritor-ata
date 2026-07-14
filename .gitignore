@@ -21,10 +21,12 @@ bin/
 logs/
 *.log
 
-# Modelos (grandes, nao versionar)
+# Modelos (grandes, nao versionar) -- mas NAO os modelos ONNX embutidos no jar (src/main/resources/models),
+# que sao pequenos (~32 MB) e essenciais ao build.
 *.bin
-models/
+/models/
 vosk-model*/
+!src/main/resources/models/
 
 # Ferramentas de terceiros baixadas localmente (LIUM_SpkDiarization, etc.)
 tools/

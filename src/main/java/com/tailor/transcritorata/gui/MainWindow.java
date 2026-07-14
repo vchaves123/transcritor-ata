@@ -32,8 +32,8 @@ import com.tailor.transcritorata.audio.ExternalProcessException;
 import com.tailor.transcritorata.audio.ProcessCancelledException;
 import com.tailor.transcritorata.audio.ProcessRunner;
 import com.tailor.transcritorata.config.AppConfig;
-import com.tailor.transcritorata.diarization.LiumSpeakerDiarizer;
 import com.tailor.transcritorata.diarization.SpeakerDiarizer;
+import com.tailor.transcritorata.diarization.onnx.OnnxSpeakerDiarizer;
 import com.tailor.transcritorata.deps.DependencyChecker;
 import com.tailor.transcritorata.deps.DependencyStatus;
 import com.tailor.transcritorata.minutes.DocxMinutesGenerator;
@@ -286,25 +286,12 @@ public final class MainWindow {
     }
 
     private void refreshDiarizationAvailability() {
-        Thread.ofVirtual().start(() -> {
-            String jar = config.get(AppConfig.KEY_DIARIZATION_JAR, "");
-            boolean available = !jar.isBlank() && java.nio.file.Files.isRegularFile(Path.of(jar));
-            display.asyncExec(() -> {
-                if (shell.isDisposed()) {
-                    return;
-                }
-                diarizationCheckbox.setEnabled(available);
-                if (!available) {
-                    diarizationCheckbox.setSelection(false);
-                    diarizationCheckbox.setToolTipText(
-                            "Configure o arquivo LIUM_SpkDiarization.jar nas Preferências para habilitar. "
-                                    + "Recurso experimental, de qualidade limitada.");
-                } else {
-                    diarizationCheckbox.setToolTipText(
-                            "Recurso experimental: a qualidade da identificação é limitada.");
-                }
-            });
-        });
+        // Os modelos de identificação de participantes vêm embutidos no jar (ONNX), então o
+        // recurso está sempre disponível — sem dependência externa nem configuração adicional.
+        diarizationCheckbox.setEnabled(true);
+        diarizationCheckbox.setToolTipText(
+                "Recurso experimental: identifica os participantes usando modelos de IA locais "
+                        + "(sem enviar áudio pela internet). A precisão pode variar conforme a gravação.");
     }
 
     private void showDependencyDialog() {
@@ -439,11 +426,7 @@ public final class MainWindow {
                     config.getInt(AppConfig.KEY_AI_CHUNK_CHAR_LIMIT, 12000));
         }
 
-        SpeakerDiarizer diarizer = null;
-        if (diarizationEnabled) {
-            diarizer = new LiumSpeakerDiarizer(config.get(AppConfig.KEY_DIARIZATION_JAVA, "java"),
-                    Path.of(config.get(AppConfig.KEY_DIARIZATION_JAR, "")), timeout);
-        }
+        SpeakerDiarizer diarizer = diarizationEnabled ? new OnnxSpeakerDiarizer() : null;
 
         boolean chunkingEnabled = config.getBoolean(AppConfig.KEY_CHUNK_ENABLED, false);
         int chunkMinutes = config.getInt(AppConfig.KEY_CHUNK_MINUTES, 20);

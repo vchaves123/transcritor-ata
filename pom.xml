@@ -59,6 +59,20 @@
       <version>${anthropic.version}</version>
     </dependency>
 
+    <!-- ONNX Runtime (diarizacao neural: modelos pyannote segmentation/embedding) -->
+    <dependency>
+      <groupId>com.microsoft.onnxruntime</groupId>
+      <artifactId>onnxruntime</artifactId>
+      <version>1.27.0</version>
+    </dependency>
+
+    <!-- FFT puro Java (extracao de mel-spectrogram para o modelo de embedding) -->
+    <dependency>
+      <groupId>com.github.wendykierp</groupId>
+      <artifactId>JTransforms</artifactId>
+      <version>3.2</version>
+    </dependency>
+
     <!-- Logging -->
     <dependency>
       <groupId>org.slf4j</groupId>

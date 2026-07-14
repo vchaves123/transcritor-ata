@@ -38,8 +38,6 @@ public final class AppConfig {
     public static final String KEY_AI_PRIVACY_CONSENT = "ai.privacyConsentGiven";
     public static final String KEY_AI_CHUNK_CHAR_LIMIT = "ai.chunkCharLimit";
     public static final String KEY_DIARIZATION_ENABLED = "diarization.enabled";
-    public static final String KEY_DIARIZATION_JAR = "diarization.liumJar";
-    public static final String KEY_DIARIZATION_JAVA = "diarization.javaExecutable";
 
     private final Properties properties = new Properties();
     private final Path configFile;
@@ -89,11 +87,6 @@ public final class AppConfig {
         properties.putIfAbsent(KEY_AI_CHUNK_CHAR_LIMIT, "12000");
         properties.putIfAbsent(KEY_COMPANY_NAME, "");
         properties.putIfAbsent(KEY_DIARIZATION_ENABLED, "false");
-        properties.putIfAbsent(KEY_DIARIZATION_JAVA, "java");
-        // Caminho relativo ao diretório de trabalho do processo (o padrão tanto ao rodar via
-        // Eclipse quanto via "java -jar" a partir da raiz do projeto). Se o jar não for
-        // encontrado ali, o DependencyChecker orienta o usuário a baixá-lo e ajustar o caminho.
-        properties.putIfAbsent(KEY_DIARIZATION_JAR, "tools/lium/lium_spkdiarization-8.4.1.jar");
     }
 
     public void save() {

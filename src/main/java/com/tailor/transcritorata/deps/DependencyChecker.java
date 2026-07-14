@@ -40,7 +40,6 @@ public final class DependencyChecker {
             results.add(checkWhisperBinary());
             results.add(checkWhisperModel());
         }
-        results.add(checkDiarization());
         return results;
     }
 
@@ -158,35 +157,5 @@ public final class DependencyChecker {
                 """;
         return new DependencyStatus("Modelo Vosk", false, "não configurado", instructions,
                 "https://alphacephei.com/vosk/models");
-    }
-
-    public DependencyStatus checkDiarization() {
-        String configured = config.get(AppConfig.KEY_DIARIZATION_JAR, "");
-        if (!configured.isBlank()) {
-            Path jarPath = Path.of(configured);
-            long size = locator.sizeOf(jarPath);
-            long minimumPlausibleBytes = 100L * 1024; // o jar do LIUM tem alguns MB
-            if (locator.exists(jarPath) && size >= minimumPlausibleBytes) {
-                return new DependencyStatus("Identificação de participantes (LIUM, opcional)", true,
-                        configured, null, null, true);
-            }
-        }
-        String instructions = """
-                Recurso opcional e experimental. Para identificar os participantes na transcrição, baixe:
-
-                    https://git-lium.univ-lemans.fr/Meignier/lium-spkdiarization/-/raw/master/jar/lium_spkdiarization-8.4.1.jar.gz
-
-                O arquivo vem compactado em .gz (não é um zip comum) — descompacte-o (ex.: com 7-Zip) para \
-                obter o lium_spkdiarization-8.4.1.jar, salve-o em uma pasta e selecione-o no campo \
-                "LIUM_SpkDiarization" das configurações. Requer Java instalado (o mesmo usado para executar \
-                este programa).
-
-                Observação: a qualidade da identificação é limitada (tecnologia clássica, não neural) e \
-                funciona melhor em áudios com poucos participantes e pouca sobreposição de falas.
-                """;
-        return new DependencyStatus("Identificação de participantes (LIUM, opcional)", false,
-                "não configurado", instructions,
-                "https://git-lium.univ-lemans.fr/Meignier/lium-spkdiarization/-/raw/master/jar/lium_spkdiarization-8.4.1.jar.gz",
-                true);
     }
 }
