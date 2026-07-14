@@ -1,5 +1,11 @@
 # Build
 target/
+dependency-reduced-pom.xml
+
+# Empacotamento portavel (gerado pelo script de release; publicado como asset do GitHub Release)
+jpackage-input/
+release/
+transcritor-ata-portable-win64-*.zip
 
 # Eclipse
 .project

@@ -121,6 +121,38 @@ O jar gerado (`target/transcritor-ata.jar`) já inclui todas as dependências (f
 > No Windows, o SWT roda normalmente na thread principal. A flag `-XstartOnFirstThread` só é
 > necessária no macOS — não se aplica ao uso normal desta aplicação no Windows.
 
+## Versão portável (release para usuários finais)
+
+Para usuários não técnicos, a forma recomendada de usar o transcritor-ata é a **versão portável**:
+um `.zip` que não precisa de instalação nem de privilégios de administrador — basta descompactar
+em qualquer pasta e executar `transcritor-ata.exe`. Já vem com:
+
+- Um runtime Java próprio (não precisa ter Java instalado).
+- ffmpeg.
+- whisper-cli (builds CPU e GPU/CUDA — a aplicação escolhe automaticamente conforme sua placa de
+  vídeo, a cada inicialização).
+- LIUM_SpkDiarization (identificação de participantes, opcional).
+
+**Não vem incluído**: o modelo de transcrição Whisper (`.bin`) — na primeira execução, um diálogo
+deixa você escolher o tamanho e baixa automaticamente.
+
+Baixe a versão mais recente na aba [Releases](../../releases) deste repositório.
+
+### Gerando o pacote portável você mesmo
+
+Requer JDK 21 (com `jpackage` no PATH), Maven, e a pasta `tools/` já populada com ffmpeg,
+whisper-cli e o LIUM (veja os pré-requisitos acima — o jeito mais fácil é rodar a própria
+aplicação uma vez, que já baixa/organiza tudo isso automaticamente na estrutura esperada).
+
+```powershell
+.\package-portable.ps1
+```
+
+Isso compila o projeto, gera um app-image com `jpackage`, empacota junto as ferramentas externas
+(sem o modelo Whisper) e produz `transcritor-ata-portable-win64-<versão>.zip` na raiz do projeto.
+Esse `.zip` **não é versionado no git** (é grande demais) — publique-o como asset de uma
+[GitHub Release](../../releases) em vez de commitá-lo.
+
 ## Importar no Eclipse
 
 `File → Import → Maven → Existing Maven Projects`, selecione a pasta do projeto. O m2e resolve
