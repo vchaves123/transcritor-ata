@@ -1,7 +1,7 @@
 package com.tailor.transcritorata.audio;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.junit.jupiter.api.Test;
 
@@ -20,19 +20,19 @@ class ProcessRunnerTest {
     }
 
     @Test
-    void emitsCommandBannerBeforeRunningTheProcess() throws Exception {
-        AtomicReference<String> firstLine = new AtomicReference<>();
+    void emitsCommandBannerBoxedBySeparatorLinesBeforeRunningTheProcess() throws Exception {
+        List<String> lines = new CopyOnWriteArrayList<>();
         ProcessRunner.Handle handle = new ProcessRunner.Handle();
 
         // "cmd /c echo ok" is a trivial, always-available Windows command used only to exercise
         // the banner + line-streaming behavior, not real ffmpeg/whisper-cli output.
-        ProcessRunner.run(List.of("cmd", "/c", "echo ok"), handle, 10, line -> {
-            if (firstLine.get() == null) {
-                firstLine.set(line);
-            }
-        });
+        ProcessRunner.run(List.of("cmd", "/c", "echo ok"), handle, 10, lines::add);
 
-        assertTrue(firstLine.get().startsWith(">> cmd /c"), "a primeira linha deve ser o banner do comando");
+        assertTrue(lines.size() >= 3, "deve haver ao menos separador + comando + separador");
+        String separator = lines.get(0);
+        assertTrue(separator.chars().allMatch(c -> c == '='), "a primeira linha deve ser um separador de '='");
+        assertEquals(separator, lines.get(2), "o banner deve ser fechado pelo mesmo separador");
+        assertTrue(lines.get(1).startsWith("cmd /c"), "a segunda linha deve ser o comando executado");
     }
 
     @Test

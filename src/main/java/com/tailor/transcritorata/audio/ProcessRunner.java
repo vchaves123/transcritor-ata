@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 public final class ProcessRunner {
 
     private static final Logger LOG = LoggerFactory.getLogger(ProcessRunner.class);
+    private static final String BANNER_SEPARATOR = "=".repeat(60);
 
     private ProcessRunner() {
     }
@@ -54,7 +55,9 @@ public final class ProcessRunner {
         String commandLine = formatCommandLine(command);
         LOG.debug("Executando comando externo: {}", commandLine);
         if (lineConsumer != null) {
-            lineConsumer.accept(">> " + commandLine);
+            lineConsumer.accept(BANNER_SEPARATOR);
+            lineConsumer.accept(commandLine);
+            lineConsumer.accept(BANNER_SEPARATOR);
         }
         try {
             ProcessBuilder builder = new ProcessBuilder(command);
