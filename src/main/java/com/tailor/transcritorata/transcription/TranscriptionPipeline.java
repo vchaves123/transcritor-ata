@@ -62,8 +62,9 @@ public final class TranscriptionPipeline {
         try {
             listener.onProgress("Extraindo áudio...", 0);
             Path wav = tempDir.resolve("audio.wav");
-            audioExtractor.extractToWav(videoFile, wav, handle);
+            audioExtractor.extractToWav(videoFile, wav, handle, line -> listener.onProgress(line, -1));
 
+            listener.onProgress("Transcrevendo... (isso pode levar alguns minutos)", 0);
             List<Segment> segments = chunkingEnabled
                     ? transcribeInChunks(wav, tempDir, listener, handle)
                     : engine.transcribe(wav, (msg, pct) -> listener.onProgress(msg, pct), handle);
@@ -105,7 +106,8 @@ public final class TranscriptionPipeline {
     private List<Segment> transcribeInChunks(Path wav, Path tempDir, ProgressListener listener,
             ProcessRunner.Handle handle) throws ExternalProcessException, IOException, InterruptedException {
         Path chunkDir = Files.createDirectory(tempDir.resolve("chunks"));
-        audioExtractor.splitIntoChunks(wav, chunkDir, "chunk", chunkMinutes, handle);
+        audioExtractor.splitIntoChunks(wav, chunkDir, "chunk", chunkMinutes, handle,
+                line -> listener.onProgress(line, -1));
 
         List<Path> chunkFiles;
         try (var stream = Files.list(chunkDir)) {

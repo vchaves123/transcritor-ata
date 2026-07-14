@@ -282,9 +282,17 @@ public final class MainWindow {
         try {
             TranscriptionPipeline pipeline = buildPipeline(useVosk, aiEnabled);
             Path outputDir = selectedVideo.getParent();
+            // percent == -1 é o sentinel usado pelos motores/ffmpeg para "apenas uma linha de
+            // log" (saída bruta do processo, frases transcritas conforme reconhecidas etc.),
+            // sem que isso deva mover a barra de progresso.
             PipelineResult result = pipeline.run(selectedVideo, outputDir,
                     (message, percent) -> display.asyncExec(() -> {
-                        if (!shell.isDisposed()) {
+                        if (shell.isDisposed()) {
+                            return;
+                        }
+                        if (percent < 0) {
+                            appendLog(message);
+                        } else {
                             appendLog(message + " (" + percent + "%)");
                             progressBar.setSelection(percent);
                         }

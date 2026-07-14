@@ -54,7 +54,7 @@ public final class VoskEngine implements TranscriptionEngine {
                 while ((read = audioIn.read(buffer)) >= 0) {
                     framesRead += read / Math.max(1, audioIn.getFormat().getFrameSize());
                     if (recognizer.acceptWaveForm(buffer, read)) {
-                        segments.addAll(parseResult(recognizer.getResult()));
+                        segments.addAll(parseResult(recognizer.getResult(), listener));
                     }
                     if (listener != null && totalFrames > 0) {
                         int percent = (int) Math.min(99, (framesRead * 100) / totalFrames);
@@ -65,7 +65,7 @@ public final class VoskEngine implements TranscriptionEngine {
                 throw new IOException("Formato de áudio não suportado pelo Vosk: " + e.getMessage(), e);
             }
 
-            segments.addAll(parseResult(recognizer.getFinalResult()));
+            segments.addAll(parseResult(recognizer.getFinalResult(), listener));
         }
 
         if (listener != null) {
@@ -74,7 +74,12 @@ public final class VoskEngine implements TranscriptionEngine {
         return segments;
     }
 
-    private List<Segment> parseResult(String json) throws IOException {
+    /**
+     * Parses one Vosk result chunk into a segment and, if {@code listener} is given, forwards
+     * the recognized text as a log-only message ({@code percent = -1}) so the user can follow
+     * along as phrases are recognized.
+     */
+    private List<Segment> parseResult(String json, ProgressListener listener) throws IOException {
         VoskJsonResult result = objectMapper.readValue(json, VoskJsonResult.class);
         List<Segment> segments = new ArrayList<>();
         if (result.result == null || result.result.isEmpty()) {
@@ -88,6 +93,9 @@ public final class VoskEngine implements TranscriptionEngine {
                 Duration.ofMillis((long) (start * 1000)),
                 Duration.ofMillis((long) (end * 1000)),
                 text));
+        if (listener != null && !text.isBlank()) {
+            listener.onProgress(text, -1);
+        }
         return segments;
     }
 }

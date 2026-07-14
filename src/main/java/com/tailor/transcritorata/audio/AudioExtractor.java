@@ -2,6 +2,7 @@ package com.tailor.transcritorata.audio;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,9 +25,12 @@ public final class AudioExtractor {
     /**
      * Converts {@code input} to {@code outputWav} (16 kHz, mono, PCM 16-bit).
      *
-     * @param handle allows the caller to cancel the running ffmpeg process
+     * @param handle           allows the caller to cancel the running ffmpeg process
+     * @param outputLineListener called with each line ffmpeg prints (stdout/stderr combined),
+     *                           so the caller can surface it in a log view; may be {@code null}
      */
-    public void extractToWav(Path input, Path outputWav, ProcessRunner.Handle handle) throws ExternalProcessException {
+    public void extractToWav(Path input, Path outputWav, ProcessRunner.Handle handle,
+            Consumer<String> outputLineListener) throws ExternalProcessException {
         List<String> command = List.of(
                 ffmpegExecutable,
                 "-y",
@@ -37,7 +41,7 @@ public final class AudioExtractor {
                 outputWav.toString());
 
         LOG.info("Extraindo áudio de {} para {}", input, outputWav);
-        ProcessRunner.run(command, handle, timeoutSeconds, line -> { });
+        ProcessRunner.run(command, handle, timeoutSeconds, forward(outputLineListener));
     }
 
     /**
@@ -45,7 +49,7 @@ public final class AudioExtractor {
      * files named {@code <outputPrefix>-000.wav}, {@code -001.wav}, etc.
      */
     public void splitIntoChunks(Path inputWav, Path outputDir, String outputPrefix, int chunkMinutes,
-            ProcessRunner.Handle handle) throws ExternalProcessException {
+            ProcessRunner.Handle handle, Consumer<String> outputLineListener) throws ExternalProcessException {
         Path pattern = outputDir.resolve(outputPrefix + "-%03d.wav");
         List<String> command = List.of(
                 ffmpegExecutable,
@@ -57,6 +61,10 @@ public final class AudioExtractor {
                 pattern.toString());
 
         LOG.info("Dividindo {} em blocos de {} minutos", inputWav, chunkMinutes);
-        ProcessRunner.run(command, handle, timeoutSeconds, line -> { });
+        ProcessRunner.run(command, handle, timeoutSeconds, forward(outputLineListener));
+    }
+
+    private static Consumer<String> forward(Consumer<String> outputLineListener) {
+        return outputLineListener != null ? outputLineListener : line -> { };
     }
 }

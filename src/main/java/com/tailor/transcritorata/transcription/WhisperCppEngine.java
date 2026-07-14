@@ -71,14 +71,23 @@ public final class WhisperCppEngine implements TranscriptionEngine {
         }
     }
 
+    /**
+     * Forwards whisper-cli's console output to the listener. Lines matching whisper.cpp's
+     * {@code progress = N%} marker update the progress bar; every other non-blank line (which
+     * includes the {@code [00:00:00.000 --> 00:00:02.500]  texto} segment lines whisper-cli
+     * prints as it transcribes) is forwarded as a log-only message using {@code percent = -1},
+     * a sentinel the GUI recognizes to mean "append to the log without moving the progress bar".
+     */
     private void reportProgress(String line, ProgressListener listener) {
-        if (listener == null) {
+        if (listener == null || line.isBlank()) {
             return;
         }
         Matcher matcher = PROGRESS_PATTERN.matcher(line);
         if (matcher.find()) {
             int percent = Integer.parseInt(matcher.group(1));
             listener.onProgress("Transcrevendo...", percent);
+        } else {
+            listener.onProgress(line.strip(), -1);
         }
     }
 
