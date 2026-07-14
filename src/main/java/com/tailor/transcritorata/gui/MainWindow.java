@@ -197,6 +197,7 @@ public final class MainWindow {
             videoFileLabel.setText(selectedVideo.getFileName().toString());
             config.set(AppConfig.KEY_LAST_VIDEO_DIR, selectedVideo.getParent().toString());
             config.save();
+            refreshDependencyState();
         }
     }
 
