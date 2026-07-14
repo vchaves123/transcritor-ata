@@ -65,8 +65,15 @@ public final class TranscriptionPipeline {
         this.diarizationEnabled = diarizationEnabled;
     }
 
+    /**
+     * @param listener            receives progress/log lines for the main pipeline (ffmpeg, transcription engine)
+     * @param diarizationListener receives progress/log lines for the (optional) diarization step, kept separate
+     *                            from {@code listener} since diarization runs concurrently with transcription and
+     *                            their raw process output would otherwise interleave in the same log view
+     */
     public PipelineResult run(Path videoFile, Path outputDir, ProgressListener listener,
-            ProcessRunner.Handle handle) throws ExternalProcessException, IOException, InterruptedException {
+            ProgressListener diarizationListener, ProcessRunner.Handle handle)
+            throws ExternalProcessException, IOException, InterruptedException {
         Path tempDir = Files.createTempDirectory("transcritor-ata-");
         try {
             listener.onProgress("Extraindo áudio...", 0);
@@ -74,14 +81,15 @@ public final class TranscriptionPipeline {
             audioExtractor.extractToWav(videoFile, wav, handle, line -> listener.onProgress(line, -1));
 
             // A diarização (opcional) roda em paralelo com a transcrição: ambas leem o mesmo WAV,
-            // como processos/tarefas independentes.
+            // como processos/tarefas independentes. O log dela vai para diarizationListener, nao
+            // para listener, para nao intercalar com a saida do motor de transcricao.
             Future<List<SpeakerTurn>> diarizationFuture = null;
             ExecutorService diarizationExecutor = null;
             if (diarizationEnabled && speakerDiarizer != null) {
-                listener.onProgress("Identificando participantes em paralelo...", -1);
+                diarizationListener.onProgress("Identificando participantes em paralelo...", -1);
                 diarizationExecutor = Executors.newVirtualThreadPerTaskExecutor();
                 diarizationFuture = diarizationExecutor.submit(
-                        () -> speakerDiarizer.diarize(wav, handle, line -> listener.onProgress(line, -1)));
+                        () -> speakerDiarizer.diarize(wav, handle, line -> diarizationListener.onProgress(line, -1)));
             }
 
             listener.onProgress("Transcrevendo... (isso pode levar alguns minutos)", 0);
@@ -96,7 +104,7 @@ public final class TranscriptionPipeline {
                 }
             }
 
-            List<AttributedSegment> attributed = attribute(segments, diarizationFuture, listener);
+            List<AttributedSegment> attributed = attribute(segments, diarizationFuture, diarizationListener);
 
             Duration totalDuration = segments.isEmpty() ? Duration.ZERO
                     : segments.get(segments.size() - 1).end();

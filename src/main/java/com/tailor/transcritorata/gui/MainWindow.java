@@ -11,6 +11,7 @@ import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Combo;
+import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.FileDialog;
 import org.eclipse.swt.widgets.Label;
@@ -63,6 +64,7 @@ public final class MainWindow {
     private Button cancelButton;
     private ProgressBar progressBar;
     private Text logText;
+    private Text diarizationLogText;
 
     private Path selectedVideo;
     private volatile ProcessRunner.Handle currentHandle;
@@ -181,10 +183,33 @@ public final class MainWindow {
         progressBar = new ProgressBar(shell, SWT.SMOOTH);
         progressBar.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
 
-        logText = new Text(shell, SWT.MULTI | SWT.BORDER | SWT.V_SCROLL | SWT.WRAP | SWT.READ_ONLY);
-        GridData logData = new GridData(SWT.FILL, SWT.FILL, true, true, 3, 1);
+        Composite logsComposite = new Composite(shell, SWT.NONE);
+        GridLayout logsLayout = new GridLayout(2, true);
+        logsLayout.marginWidth = 0;
+        logsLayout.marginHeight = 0;
+        logsComposite.setLayout(logsLayout);
+        logsComposite.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 3, 1));
+
+        Composite mainLogColumn = new Composite(logsComposite, SWT.NONE);
+        mainLogColumn.setLayout(new GridLayout(1, false));
+        mainLogColumn.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+        Label mainLogLabel = new Label(mainLogColumn, SWT.NONE);
+        mainLogLabel.setText("Transcrição");
+        logText = new Text(mainLogColumn, SWT.MULTI | SWT.BORDER | SWT.V_SCROLL | SWT.WRAP | SWT.READ_ONLY);
+        GridData logData = new GridData(SWT.FILL, SWT.FILL, true, true);
         logData.heightHint = 220;
         logText.setLayoutData(logData);
+
+        Composite diarizationLogColumn = new Composite(logsComposite, SWT.NONE);
+        diarizationLogColumn.setLayout(new GridLayout(1, false));
+        diarizationLogColumn.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+        Label diarizationLogLabel = new Label(diarizationLogColumn, SWT.NONE);
+        diarizationLogLabel.setText("Identificação de participantes");
+        diarizationLogText = new Text(diarizationLogColumn,
+                SWT.MULTI | SWT.BORDER | SWT.V_SCROLL | SWT.WRAP | SWT.READ_ONLY);
+        GridData diarizationLogData = new GridData(SWT.FILL, SWT.FILL, true, true);
+        diarizationLogData.heightHint = 220;
+        diarizationLogText.setLayoutData(diarizationLogData);
     }
 
     private void buildMenu() {
@@ -301,6 +326,7 @@ public final class MainWindow {
         transcribeButton.setEnabled(false);
         cancelButton.setEnabled(true);
         logText.setText("");
+        diarizationLogText.setText("");
         progressBar.setSelection(0);
 
         ProcessRunner.Handle handle = new ProcessRunner.Handle();
@@ -341,6 +367,11 @@ public final class MainWindow {
                         } else {
                             appendLog(message + " (" + percent + "%)");
                             progressBar.setSelection(percent);
+                        }
+                    }),
+                    (message, percent) -> display.asyncExec(() -> {
+                        if (!shell.isDisposed()) {
+                            appendDiarizationLog(message);
                         }
                     }),
                     handle);
@@ -448,5 +479,9 @@ public final class MainWindow {
 
     private void appendLog(String message) {
         logText.append(message + System.lineSeparator());
+    }
+
+    private void appendDiarizationLog(String message) {
+        diarizationLogText.append(message + System.lineSeparator());
     }
 }
