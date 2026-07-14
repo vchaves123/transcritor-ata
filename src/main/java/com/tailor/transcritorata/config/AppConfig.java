@@ -88,6 +88,10 @@ public final class AppConfig {
         properties.putIfAbsent(KEY_COMPANY_NAME, "");
         properties.putIfAbsent(KEY_DIARIZATION_ENABLED, "false");
         properties.putIfAbsent(KEY_DIARIZATION_JAVA, "java");
+        // Caminho relativo ao diretório de trabalho do processo (o padrão tanto ao rodar via
+        // Eclipse quanto via "java -jar" a partir da raiz do projeto). Se o jar não for
+        // encontrado ali, o DependencyChecker orienta o usuário a baixá-lo e ajustar o caminho.
+        properties.putIfAbsent(KEY_DIARIZATION_JAR, "tools/lium/lium_spkdiarization-8.4.1.jar");
     }
 
     public void save() {

@@ -49,6 +49,14 @@ Procure o arquivo `.zip` com sufixo `-bin-x64`, extraia em uma pasta de sua pref
 preferências do transcritor-ata, aponte o campo do executável para o `whisper-cli.exe` extraído.
 **Não é necessário compilar nada.**
 
+**Detecção automática de GPU**: se você extrair os builds nas pastas `tools/whisper-cpu/` e
+`tools/whisper-cuda/` na raiz do projeto (mesmo layout dos `.zip` `whisper-bin-x64` e
+`whisper-cublas-*-bin-x64`, respectivamente), a aplicação detecta em tempo de execução se há uma
+GPU NVIDIA disponível (via `nvidia-smi`) e ajusta automaticamente o executável configurado a cada
+inicialização — cuBLAS quando há GPU, CPU quando não há. Essas pastas ficam fora do controle de
+versão (`.gitignore`) por serem binários grandes de terceiros; baixe-as você mesmo se quiser esse
+comportamento automático, ou configure manualmente um único caminho fixo nas preferências.
+
 ### 3. Um modelo Whisper (`.bin`)
 
 Baixe em: https://huggingface.co/ggerganov/whisper.cpp/tree/main
