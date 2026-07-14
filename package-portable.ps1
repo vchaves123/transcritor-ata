@@ -6,10 +6,15 @@
 # externas (ffmpeg, whisper-cli CPU e CUDA, LIUM_SpkDiarization) -- exceto o modelo Whisper,
 # que o proprio usuario escolhe e baixa na primeira execucao (ModelSetupDialog).
 #
+# O runtime do jpackage NAO inclui um java.exe utilizavel (soh o launcher nativo do app), entao
+# este script tambem gera via jlink um runtime Java minimo dedicado (tools/jre) so para rodar o
+# LIUM_SpkDiarization como processo externo -- sem isso, a identificacao de participantes falha
+# silenciosamente em qualquer maquina sem JDK instalado separadamente.
+#
 # Uso:
 #   .\package-portable.ps1 [-Version 1.0.0]
 #
-# Requisitos: JDK 21 com jpackage no PATH, Maven, e a pasta tools/ ja populada
+# Requisitos: JDK 21 com jpackage e jlink no PATH, Maven, e a pasta tools/ ja populada
 # (veja o README.md - secao de pre-requisitos - para como baixar ffmpeg/whisper-cli/LIUM).
 
 param(
@@ -49,7 +54,7 @@ Write-Host "== 3/5: Gerando app-image portavel com jpackage ==" -ForegroundColor
     --dest $ReleaseDir
 if ($LASTEXITCODE -ne 0) { throw "jpackage falhou." }
 
-Write-Host "== 4/5: Copiando ferramentas externas (ffmpeg, whisper-cli, LIUM) ==" -ForegroundColor Cyan
+Write-Host "== 4/6: Copiando ferramentas externas (ffmpeg, whisper-cli, LIUM) ==" -ForegroundColor Cyan
 if (-not (Test-Path $ToolsSrc)) {
     throw "Pasta tools/ nao encontrada em $ToolsSrc. Baixe ffmpeg/whisper-cli/LIUM antes de empacotar (veja o README)."
 }
@@ -58,6 +63,12 @@ Copy-Item $ToolsSrc $ToolsDest -Recurse
 # O modelo Whisper NAO entra no pacote: o usuario escolhe e baixa na primeira execucao.
 $ModelsDir = Join-Path $ToolsDest "models"
 if (Test-Path $ModelsDir) { Remove-Item $ModelsDir -Recurse -Force }
+
+Write-Host "== 5/6: Gerando runtime Java dedicado para o LIUM (jlink) ==" -ForegroundColor Cyan
+$JreDest = Join-Path $ToolsDest "jre"
+if (Test-Path $JreDest) { Remove-Item $JreDest -Recurse -Force }
+& jlink --add-modules ALL-MODULE-PATH --output $JreDest --strip-debug --no-header-files --no-man-pages
+if ($LASTEXITCODE -ne 0) { throw "jlink falhou ao gerar o runtime para o LIUM." }
 
 @"
 transcritor-ata $Version - versao portavel para Windows 11 (64-bit)
@@ -76,7 +87,7 @@ identificacao de participantes (LIUM_SpkDiarization). O unico download feito por
 modelo de transcricao, na primeira execucao.
 "@ | Out-File -FilePath (Join-Path $AppImageDir "LEIA-ME.txt") -Encoding utf8
 
-Write-Host "== 5/5: Compactando pacote final ==" -ForegroundColor Cyan
+Write-Host "== 6/6: Compactando pacote final ==" -ForegroundColor Cyan
 $ZipPath = Join-Path $ProjectRoot $ZipName
 if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
 Compress-Archive -Path $AppImageDir -DestinationPath $ZipPath -CompressionLevel Optimal

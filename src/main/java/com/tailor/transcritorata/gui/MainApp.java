@@ -6,6 +6,7 @@ import org.eclipse.swt.widgets.Display;
 
 import com.tailor.transcritorata.config.AppConfig;
 import com.tailor.transcritorata.deps.BundledFfmpegSelector;
+import com.tailor.transcritorata.deps.BundledJavaSelector;
 import com.tailor.transcritorata.deps.ExecutableLocator;
 import com.tailor.transcritorata.deps.GpuDetector;
 import com.tailor.transcritorata.deps.WhisperVariantSelector;
@@ -36,6 +37,7 @@ public final class MainApp {
 
             ExecutableLocator locator = new ExecutableLocator.Default();
             BundledFfmpegSelector.applyIfBundlePresent(config, locator);
+            BundledJavaSelector.applyIfBundlePresent(config, locator);
             WhisperVariantSelector.applyBestVariant(config, new GpuDetector(locator), locator);
             ModelSetupDialog.showIfNeeded(display, config);
 

@@ -100,8 +100,15 @@ https://git-lium.univ-lemans.fr/Meignier/lium-spkdiarization/-/raw/master/jar/li
 
 O arquivo vem compactado em `.gz` (não é um zip comum) — descompacte-o (ex.: com 7-Zip) para obter
 o `lium_spkdiarization-8.4.1.jar`, salve-o em uma pasta e selecione-o no campo "LIUM_SpkDiarization"
-das preferências. Requer Java instalado (o mesmo usado para rodar o programa). Marque então o
-checkbox "Identificar participantes na transcrição (experimental)".
+das preferências. Marque então o checkbox "Identificar participantes na transcrição (experimental)".
+
+O LIUM roda como um processo Java separado. Na versão portável, isso já vem resolvido: o pacote
+inclui um runtime Java dedicado só para essa finalidade (`tools/jre/`, gerado via `jlink`), já que
+o runtime principal do app (empacotado com `jpackage`) não inclui um `java.exe` utilizável — sem
+esse runtime dedicado, a identificação de participantes falharia silenciosamente em qualquer
+máquina sem um JDK instalado separadamente. Se você estiver rodando a partir do código-fonte (não
+da versão portável) e não tiver um JDK/`java` no PATH, aponte manualmente o campo "Java (para
+diarização)" das preferências para um `java.exe` válido.
 
 > A identificação usa a ferramenta clássica LIUM (não neural): a qualidade é limitada e funciona
 > melhor em áudios com poucos participantes e pouca sobreposição de falas. Ela roda em paralelo com
