@@ -40,6 +40,20 @@ final class PreferencesDialog {
         Text whisperModelText = row(dialog, "Modelo Whisper (.bin)",
                 config.get(AppConfig.KEY_WHISPER_MODEL, ""), browseFile(dialog, "*.bin"));
 
+        new Label(dialog, SWT.NONE); // alinha a coluna com as demais linhas
+        Button downloadModelButton = new Button(dialog, SWT.PUSH);
+        downloadModelButton.setText("Baixar outro modelo...");
+        GridData downloadModelData = new GridData(SWT.FILL, SWT.CENTER, true, false);
+        downloadModelData.horizontalSpan = 2;
+        downloadModelButton.setLayoutData(downloadModelData);
+        downloadModelButton.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                ModelSetupDialog.show(dialog, config);
+                whisperModelText.setText(config.get(AppConfig.KEY_WHISPER_MODEL, ""));
+            }
+        });
+
         Text voskModelDirText = row(dialog, "Pasta do modelo Vosk",
                 config.get(AppConfig.KEY_VOSK_MODEL_DIR, ""), browseDirectory(dialog));
 

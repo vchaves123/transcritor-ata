@@ -22,9 +22,14 @@ import com.tailor.transcritorata.deps.WhisperModelOption;
 import com.tailor.transcritorata.deps.WhisperModelSetupChecker;
 
 /**
- * First-run dialog offering to download a Whisper model, so the user doesn't have to hunt for a
- * download link and manually edit preferences. Shown whenever {@link WhisperModelSetupChecker}
- * reports no valid model is configured for the (default) Whisper engine.
+ * Dialog offering to download a Whisper model, so the user doesn't have to hunt for a download
+ * link and manually edit preferences. Used in two places:
+ * <ul>
+ *   <li>{@link #showIfNeeded} — on startup, only when {@link WhisperModelSetupChecker} reports
+ *       no valid model is configured.</li>
+ *   <li>{@link #show} — from Preferences, any time the user wants to switch to a different
+ *       model (e.g. a smaller one, after hitting a GPU out-of-memory error with a larger one).</li>
+ * </ul>
  */
 final class ModelSetupDialog {
 
@@ -33,20 +38,39 @@ final class ModelSetupDialog {
     private ModelSetupDialog() {
     }
 
+    /** Startup gate: only opens the dialog when no valid Whisper model is currently configured. */
     static void showIfNeeded(Display display, AppConfig config) {
         ExecutableLocator locator = new ExecutableLocator.Default();
         if (!WhisperModelSetupChecker.isNeeded(config, locator)) {
             return;
         }
-
         Shell dialog = new Shell(display, SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
-        dialog.setText("Configuração inicial — modelo de transcrição");
+        open(dialog, display, config, "Configuração inicial — modelo de transcrição",
+                "Para transcrever reuniões, o transcritor-ata precisa de um modelo do Whisper. "
+                        + "Escolha uma opção abaixo para baixar automaticamente (o arquivo será salvo em "
+                        + MODELS_DIR + "/ e as preferências serão ajustadas sozinhas):",
+                "Pular por agora");
+    }
+
+    /** Always opens the dialog, letting the user download and switch to a different model. */
+    static void show(Shell parent, AppConfig config) {
+        Shell dialog = new Shell(parent, SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
+        open(dialog, parent.getDisplay(), config,
+                "Baixar outro modelo de transcrição",
+                "Escolha um modelo para baixar. Modelos menores usam menos memória (RAM/VRAM) e são mais "
+                        + "rápidos, mas transcrevem com menos precisão — uma boa opção se você teve problemas "
+                        + "de memória com o modelo atual. O arquivo será salvo em " + MODELS_DIR
+                        + "/ e as preferências serão ajustadas automaticamente:",
+                "Fechar");
+    }
+
+    private static void open(Shell dialog, Display display, AppConfig config, String title, String introText,
+            String closeButtonLabel) {
+        dialog.setText(title);
         dialog.setLayout(new GridLayout(1, false));
 
         Label intro = new Label(dialog, SWT.WRAP);
-        intro.setText("Para transcrever reuniões, o transcritor-ata precisa de um modelo do Whisper. "
-                + "Escolha uma opção abaixo para baixar automaticamente (o arquivo será salvo em "
-                + MODELS_DIR + "/ e as preferências serão ajustadas sozinhas):");
+        intro.setText(introText);
         GridData introData = new GridData(SWT.FILL, SWT.CENTER, true, false);
         introData.widthHint = 480;
         intro.setLayoutData(introData);
@@ -77,13 +101,13 @@ final class ModelSetupDialog {
         Button downloadButton = new Button(buttons, SWT.PUSH);
         downloadButton.setText("Baixar");
 
-        Button skipButton = new Button(buttons, SWT.PUSH);
-        skipButton.setText("Pular por agora");
+        Button closeButton = new Button(buttons, SWT.PUSH);
+        closeButton.setText(closeButtonLabel);
 
         AtomicBoolean cancelled = new AtomicBoolean(false);
         AtomicBoolean downloading = new AtomicBoolean(false);
 
-        skipButton.addSelectionListener(new SelectionAdapter() {
+        closeButton.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
                 if (downloading.get()) {
@@ -103,12 +127,12 @@ final class ModelSetupDialog {
                 for (Button radio : radios) {
                     radio.setEnabled(false);
                 }
-                skipButton.setText("Cancelar");
+                closeButton.setText("Cancelar");
                 progressBar.setVisible(true);
                 statusLabel.setText("Iniciando download de " + chosen.fileName() + "...");
 
                 Thread.ofVirtual().start(() -> runDownload(display, dialog, config, chosen, progressBar,
-                        statusLabel, downloadButton, skipButton, radios, cancelled, downloading));
+                        statusLabel, downloadButton, closeButton, closeButtonLabel, radios, cancelled, downloading));
             }
         });
 
@@ -123,8 +147,8 @@ final class ModelSetupDialog {
     }
 
     private static void runDownload(Display display, Shell dialog, AppConfig config, WhisperModelOption chosen,
-            ProgressBar progressBar, Label statusLabel, Button downloadButton, Button skipButton,
-            Button[] radios, AtomicBoolean cancelled, AtomicBoolean downloading) {
+            ProgressBar progressBar, Label statusLabel, Button downloadButton, Button closeButton,
+            String closeButtonLabel, Button[] radios, AtomicBoolean cancelled, AtomicBoolean downloading) {
         try {
             Path targetDir = Path.of(MODELS_DIR);
             Path downloaded = new WhisperModelDownloader().download(chosen, targetDir,
@@ -159,7 +183,7 @@ final class ModelSetupDialog {
                 for (Button radio : radios) {
                     radio.setEnabled(true);
                 }
-                skipButton.setText("Pular por agora");
+                closeButton.setText(closeButtonLabel);
                 progressBar.setVisible(false);
             });
         } finally {
