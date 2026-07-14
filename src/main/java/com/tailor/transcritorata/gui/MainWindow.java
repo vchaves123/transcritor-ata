@@ -27,6 +27,7 @@ import com.tailor.transcritorata.ai.AnthropicMinutesStructurer;
 import com.tailor.transcritorata.ai.MinutesStructurer;
 import com.tailor.transcritorata.audio.AudioExtractor;
 import com.tailor.transcritorata.audio.ExternalProcessException;
+import com.tailor.transcritorata.audio.ProcessCancelledException;
 import com.tailor.transcritorata.audio.ProcessRunner;
 import com.tailor.transcritorata.config.AppConfig;
 import com.tailor.transcritorata.deps.DependencyChecker;
@@ -308,6 +309,17 @@ public final class MainWindow {
                 cancelButton.setEnabled(false);
                 SuccessDialog.show(shell, result.simpleMinutesPath(), result.structuredMinutesPath(),
                         result.aiWarning());
+            });
+        } catch (ProcessCancelledException e) {
+            LOG.info("Transcrição cancelada pelo usuário");
+            display.asyncExec(() -> {
+                if (shell.isDisposed()) {
+                    return;
+                }
+                appendLog("Transcrição cancelada.");
+                transcribeButton.setEnabled(true);
+                cancelButton.setEnabled(false);
+                progressBar.setSelection(0);
             });
         } catch (ExternalProcessException e) {
             LOG.error("Falha em processo externo durante a transcrição", e);

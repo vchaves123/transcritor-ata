@@ -27,13 +27,19 @@ public final class ProcessRunner {
     /** Handle to a running external process, allowing the caller to cancel it. */
     public static final class Handle {
         private final AtomicReference<Process> processRef = new AtomicReference<>();
+        private volatile boolean cancelled;
 
         public void cancel() {
+            cancelled = true;
             Process process = processRef.get();
             if (process != null && process.isAlive()) {
                 process.descendants().forEach(ProcessHandle::destroyForcibly);
                 process.destroyForcibly();
             }
+        }
+
+        public boolean isCancelled() {
+            return cancelled;
         }
     }
 
@@ -69,6 +75,13 @@ public final class ProcessRunner {
             }
 
             boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+
+            // Checked before inspecting the exit code: a forcibly-killed process almost always
+            // exits with a non-zero code, which would otherwise be reported as a generic failure
+            // instead of the deliberate cancellation it actually was.
+            if (handle.isCancelled()) {
+                throw new ProcessCancelledException(output.toString());
+            }
             if (!finished) {
                 process.destroyForcibly();
                 throw new ExternalProcessException(
@@ -81,11 +94,14 @@ public final class ProcessRunner {
                         output.toString());
             }
         } catch (IOException e) {
+            if (handle.isCancelled()) {
+                throw new ProcessCancelledException(output.toString());
+            }
             throw new ExternalProcessException(
                     "Não foi possível executar o processo externo: " + e.getMessage(), output.toString());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new ExternalProcessException("A execução foi cancelada.", output.toString());
+            throw new ProcessCancelledException(output.toString());
         }
     }
 

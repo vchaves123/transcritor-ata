@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ProcessRunnerTest {
@@ -32,5 +33,27 @@ class ProcessRunnerTest {
         });
 
         assertTrue(firstLine.get().startsWith(">> cmd /c"), "a primeira linha deve ser o banner do comando");
+    }
+
+    @Test
+    void throwsProcessCancelledExceptionInsteadOfGenericFailureWhenCancelled() throws Exception {
+        ProcessRunner.Handle handle = new ProcessRunner.Handle();
+
+        // "ping -n 20 127.0.0.1" is a long-running, always-available Windows command used only
+        // to give the cancel() call below time to fire before the process would exit on its own.
+        Thread canceller = new Thread(() -> {
+            try {
+                Thread.sleep(300);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            handle.cancel();
+        });
+        canceller.start();
+
+        assertThrows(ProcessCancelledException.class, () ->
+                ProcessRunner.run(List.of("cmd", "/c", "ping -n 20 127.0.0.1 > nul"), handle, 30, line -> { }));
+
+        canceller.join();
     }
 }
