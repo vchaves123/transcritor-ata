@@ -74,11 +74,14 @@ correspondente das preferências.
 
 ### 6. (Opcional, experimental) Identificação de participantes
 
-Para que a transcrição indique quem falou cada trecho (`Pessoa 1`, `Pessoa 2`, ...), baixe o
-arquivo `lium_spkdiarization-8.4.1.jar` em
-https://git-lium.univ-lemans.fr/Meignier/lium-spkdiarization , salve-o em uma pasta e selecione-o
-no campo "LIUM_SpkDiarization" das preferências. Requer Java instalado (o mesmo usado para rodar o
-programa). Marque então o checkbox "Identificar participantes na transcrição (experimental)".
+Para que a transcrição indique quem falou cada trecho (`Pessoa 1`, `Pessoa 2`, ...), baixe:
+
+https://git-lium.univ-lemans.fr/Meignier/lium-spkdiarization/-/raw/master/jar/lium_spkdiarization-8.4.1.jar.gz
+
+O arquivo vem compactado em `.gz` (não é um zip comum) — descompacte-o (ex.: com 7-Zip) para obter
+o `lium_spkdiarization-8.4.1.jar`, salve-o em uma pasta e selecione-o no campo "LIUM_SpkDiarization"
+das preferências. Requer Java instalado (o mesmo usado para rodar o programa). Marque então o
+checkbox "Identificar participantes na transcrição (experimental)".
 
 > A identificação usa a ferramenta clássica LIUM (não neural): a qualidade é limitada e funciona
 > melhor em áudios com poucos participantes e pouca sobreposição de falas. Ela roda em paralelo com

@@ -167,19 +167,21 @@ public final class DependencyChecker {
             }
         }
         String instructions = """
-                Recurso opcional e experimental. Para identificar os participantes na transcrição, baixe o \
-                arquivo lium_spkdiarization-8.4.1.jar em:
+                Recurso opcional e experimental. Para identificar os participantes na transcrição, baixe:
 
-                    https://git-lium.univ-lemans.fr/Meignier/lium-spkdiarization
+                    https://git-lium.univ-lemans.fr/Meignier/lium-spkdiarization/-/raw/master/jar/lium_spkdiarization-8.4.1.jar.gz
 
-                Salve o arquivo .jar em uma pasta e selecione-o no campo "LIUM_SpkDiarization" das \
-                configurações. Requer Java instalado (o mesmo usado para executar este programa).
+                O arquivo vem compactado em .gz (não é um zip comum) — descompacte-o (ex.: com 7-Zip) para \
+                obter o lium_spkdiarization-8.4.1.jar, salve-o em uma pasta e selecione-o no campo \
+                "LIUM_SpkDiarization" das configurações. Requer Java instalado (o mesmo usado para executar \
+                este programa).
 
                 Observação: a qualidade da identificação é limitada (tecnologia clássica, não neural) e \
                 funciona melhor em áudios com poucos participantes e pouca sobreposição de falas.
                 """;
         return new DependencyStatus("Identificação de participantes (LIUM, opcional)", false,
-                "não configurado", instructions, "https://git-lium.univ-lemans.fr/Meignier/lium-spkdiarization",
+                "não configurado", instructions,
+                "https://git-lium.univ-lemans.fr/Meignier/lium-spkdiarization/-/raw/master/jar/lium_spkdiarization-8.4.1.jar.gz",
                 true);
     }
 }
