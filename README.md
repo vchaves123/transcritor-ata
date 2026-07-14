@@ -72,6 +72,18 @@ funciona 100% offline. Obtenha uma chave em https://console.anthropic.com — o 
 Anthropic conforme o consumo. Configure via variável de ambiente `ANTHROPIC_API_KEY` ou no campo
 correspondente das preferências.
 
+### 6. (Opcional, experimental) Identificação de participantes
+
+Para que a transcrição indique quem falou cada trecho (`Pessoa 1`, `Pessoa 2`, ...), baixe o
+arquivo `lium_spkdiarization-8.4.1.jar` em
+https://git-lium.univ-lemans.fr/Meignier/lium-spkdiarization , salve-o em uma pasta e selecione-o
+no campo "LIUM_SpkDiarization" das preferências. Requer Java instalado (o mesmo usado para rodar o
+programa). Marque então o checkbox "Identificar participantes na transcrição (experimental)".
+
+> A identificação usa a ferramenta clássica LIUM (não neural): a qualidade é limitada e funciona
+> melhor em áudios com poucos participantes e pouca sobreposição de falas. Ela roda em paralelo com
+> a transcrição e, se falhar, a ata é gerada normalmente, apenas sem os rótulos de locutor.
+
 ## Compilar e executar
 
 Requer **JDK 21** e **Maven**.
@@ -99,6 +111,7 @@ operacional (Windows por padrão).
 - `transcription` — motores de transcrição (Whisper.cpp, Vosk) e o pipeline orquestrador.
 - `minutes` — geração das atas em `.docx` (Apache POI).
 - `ai` — integração opcional com a API da Anthropic para a ata estruturada.
+- `diarization` — identificação opcional de participantes (LIUM_SpkDiarization).
 - `deps` — verificador de dependências.
 - `config` — preferências do usuário.
 
@@ -109,7 +122,8 @@ operacional (Windows por padrão).
 
 ## Limitações conhecidas
 
-- Não há diarização (identificação de quem está falando).
+- A identificação de participantes (diarização) é opcional e experimental, baseada na ferramenta
+  clássica LIUM — bem menos precisa que soluções neurais modernas. Veja o item 6 dos pré-requisitos.
 - Não há instalador (`.msi`/`.exe`); a distribuição é via jar executável.
 - Os estilos da ata são definidos em código (`DocxMinutesGenerator`), sem uso de um template
   `.dotx` corporativo — a classe já foi estruturada para essa evolução futura.

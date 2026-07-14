@@ -40,6 +40,9 @@ final class PreferencesDialog {
         Text voskModelDirText = row(dialog, "Pasta do modelo Vosk",
                 config.get(AppConfig.KEY_VOSK_MODEL_DIR, ""), browseDirectory(dialog));
 
+        Text diarizationJarText = row(dialog, "LIUM_SpkDiarization.jar (participantes, opcional)",
+                config.get(AppConfig.KEY_DIARIZATION_JAR, ""), browseFile(dialog, "*.jar"));
+
         Text chunkMinutesText = row(dialog, "Dividir em blocos de N minutos (reuniões longas)",
                 Integer.toString(config.getInt(AppConfig.KEY_CHUNK_MINUTES, 20)), null);
 
@@ -84,6 +87,7 @@ final class PreferencesDialog {
                 config.set(AppConfig.KEY_WHISPER_BINARY, whisperBinaryText.getText().trim());
                 config.set(AppConfig.KEY_WHISPER_MODEL, whisperModelText.getText().trim());
                 config.set(AppConfig.KEY_VOSK_MODEL_DIR, voskModelDirText.getText().trim());
+                config.set(AppConfig.KEY_DIARIZATION_JAR, diarizationJarText.getText().trim());
                 config.setBoolean(AppConfig.KEY_CHUNK_ENABLED, chunkEnabledCheckbox.getSelection());
                 config.set(AppConfig.KEY_AI_MODEL, aiModelText.getText().trim());
 

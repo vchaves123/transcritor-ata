@@ -30,6 +30,8 @@ import com.tailor.transcritorata.audio.ExternalProcessException;
 import com.tailor.transcritorata.audio.ProcessCancelledException;
 import com.tailor.transcritorata.audio.ProcessRunner;
 import com.tailor.transcritorata.config.AppConfig;
+import com.tailor.transcritorata.diarization.LiumSpeakerDiarizer;
+import com.tailor.transcritorata.diarization.SpeakerDiarizer;
 import com.tailor.transcritorata.deps.DependencyChecker;
 import com.tailor.transcritorata.deps.DependencyStatus;
 import com.tailor.transcritorata.minutes.DocxMinutesGenerator;
@@ -54,6 +56,7 @@ public final class MainWindow {
     private Label videoFileLabel;
     private Combo engineCombo;
     private Button aiCheckbox;
+    private Button diarizationCheckbox;
     private Button transcribeButton;
     private Button cancelButton;
     private ProgressBar progressBar;
@@ -137,6 +140,19 @@ public final class MainWindow {
             @Override
             public void widgetSelected(SelectionEvent e) {
                 config.setBoolean(AppConfig.KEY_AI_ENABLED, aiCheckbox.getSelection());
+                config.save();
+            }
+        });
+
+        diarizationCheckbox = new Button(shell, SWT.CHECK);
+        diarizationCheckbox.setText("Identificar participantes na transcrição (experimental)");
+        diarizationCheckbox.setSelection(config.getBoolean(AppConfig.KEY_DIARIZATION_ENABLED, false));
+        GridData diarizationCheckboxData = new GridData(SWT.FILL, SWT.CENTER, true, false, 3, 1);
+        diarizationCheckbox.setLayoutData(diarizationCheckboxData);
+        diarizationCheckbox.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                config.setBoolean(AppConfig.KEY_DIARIZATION_ENABLED, diarizationCheckbox.getSelection());
                 config.save();
             }
         });
@@ -239,6 +255,29 @@ public final class MainWindow {
                 }
             });
         });
+        refreshDiarizationAvailability();
+    }
+
+    private void refreshDiarizationAvailability() {
+        Thread.ofVirtual().start(() -> {
+            String jar = config.get(AppConfig.KEY_DIARIZATION_JAR, "");
+            boolean available = !jar.isBlank() && java.nio.file.Files.isRegularFile(Path.of(jar));
+            display.asyncExec(() -> {
+                if (shell.isDisposed()) {
+                    return;
+                }
+                diarizationCheckbox.setEnabled(available);
+                if (!available) {
+                    diarizationCheckbox.setSelection(false);
+                    diarizationCheckbox.setToolTipText(
+                            "Configure o arquivo LIUM_SpkDiarization.jar nas Preferências para habilitar. "
+                                    + "Recurso experimental, de qualidade limitada.");
+                } else {
+                    diarizationCheckbox.setToolTipText(
+                            "Recurso experimental: a qualidade da identificação é limitada.");
+                }
+            });
+        });
     }
 
     private void showDependencyDialog() {
@@ -269,8 +308,9 @@ public final class MainWindow {
         // widgets SWT (dispararia SWTException: Invalid thread access).
         boolean useVosk = engineCombo.getSelectionIndex() == 1;
         boolean aiEnabled = aiCheckbox.getEnabled() && aiCheckbox.getSelection();
+        boolean diarizationEnabled = diarizationCheckbox.getEnabled() && diarizationCheckbox.getSelection();
 
-        Thread.ofVirtual().start(() -> runPipeline(handle, useVosk, aiEnabled));
+        Thread.ofVirtual().start(() -> runPipeline(handle, useVosk, aiEnabled, diarizationEnabled));
     }
 
     private void cancelTranscription() {
@@ -281,9 +321,10 @@ public final class MainWindow {
         appendLog("Cancelando...");
     }
 
-    private void runPipeline(ProcessRunner.Handle handle, boolean useVosk, boolean aiEnabled) {
+    private void runPipeline(ProcessRunner.Handle handle, boolean useVosk, boolean aiEnabled,
+            boolean diarizationEnabled) {
         try {
-            TranscriptionPipeline pipeline = buildPipeline(useVosk, aiEnabled);
+            TranscriptionPipeline pipeline = buildPipeline(useVosk, aiEnabled, diarizationEnabled);
             Path outputDir = selectedVideo.getParent();
             // percent == -1 é o sentinel usado pelos motores/ffmpeg para "apenas uma linha de
             // log" (saída bruta do processo, frases transcritas conforme reconhecidas etc.),
@@ -344,7 +385,8 @@ public final class MainWindow {
         ErrorDialog.show(shell, friendlyMessage, details);
     }
 
-    private TranscriptionPipeline buildPipeline(boolean useVosk, boolean aiEnabled) throws Exception {
+    private TranscriptionPipeline buildPipeline(boolean useVosk, boolean aiEnabled, boolean diarizationEnabled)
+            throws Exception {
         long timeout = config.getInt(AppConfig.KEY_PROCESS_TIMEOUT_SECONDS, (int) DEFAULT_TIMEOUT_SECONDS);
         AudioExtractor audioExtractor = new AudioExtractor(resolveFfmpegExecutable(), timeout);
 
@@ -365,11 +407,17 @@ public final class MainWindow {
                     config.getInt(AppConfig.KEY_AI_CHUNK_CHAR_LIMIT, 12000));
         }
 
+        SpeakerDiarizer diarizer = null;
+        if (diarizationEnabled) {
+            diarizer = new LiumSpeakerDiarizer(config.get(AppConfig.KEY_DIARIZATION_JAVA, "java"),
+                    Path.of(config.get(AppConfig.KEY_DIARIZATION_JAR, "")), timeout);
+        }
+
         boolean chunkingEnabled = config.getBoolean(AppConfig.KEY_CHUNK_ENABLED, false);
         int chunkMinutes = config.getInt(AppConfig.KEY_CHUNK_MINUTES, 20);
 
-        return new TranscriptionPipeline(audioExtractor, engine, generator, structurer,
-                chunkingEnabled, chunkMinutes, aiEnabled);
+        return new TranscriptionPipeline(audioExtractor, engine, generator, structurer, diarizer,
+                chunkingEnabled, chunkMinutes, aiEnabled, diarizationEnabled);
     }
 
     private String resolveFfmpegExecutable() {

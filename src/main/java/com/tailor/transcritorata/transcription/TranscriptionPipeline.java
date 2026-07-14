@@ -21,8 +21,12 @@ import com.tailor.transcritorata.ai.StructuredMinutes;
 import com.tailor.transcritorata.audio.AudioExtractor;
 import com.tailor.transcritorata.audio.ExternalProcessException;
 import com.tailor.transcritorata.audio.ProcessRunner;
+import com.tailor.transcritorata.diarization.SpeakerAttributor;
+import com.tailor.transcritorata.diarization.SpeakerDiarizer;
+import com.tailor.transcritorata.diarization.SpeakerTurn;
 import com.tailor.transcritorata.minutes.DocxMinutesGenerator;
 import com.tailor.transcritorata.minutes.MeetingMetadata;
+import com.tailor.transcritorata.model.AttributedSegment;
 import com.tailor.transcritorata.model.Segment;
 
 /**
@@ -40,20 +44,25 @@ public final class TranscriptionPipeline {
     private final TranscriptionEngine engine;
     private final DocxMinutesGenerator docxGenerator;
     private final MinutesStructurer minutesStructurer;
+    private final SpeakerDiarizer speakerDiarizer;
     private final boolean chunkingEnabled;
     private final int chunkMinutes;
     private final boolean aiEnabled;
+    private final boolean diarizationEnabled;
 
     public TranscriptionPipeline(AudioExtractor audioExtractor, TranscriptionEngine engine,
             DocxMinutesGenerator docxGenerator, MinutesStructurer minutesStructurer,
-            boolean chunkingEnabled, int chunkMinutes, boolean aiEnabled) {
+            SpeakerDiarizer speakerDiarizer, boolean chunkingEnabled, int chunkMinutes,
+            boolean aiEnabled, boolean diarizationEnabled) {
         this.audioExtractor = audioExtractor;
         this.engine = engine;
         this.docxGenerator = docxGenerator;
         this.minutesStructurer = minutesStructurer;
+        this.speakerDiarizer = speakerDiarizer;
         this.chunkingEnabled = chunkingEnabled;
         this.chunkMinutes = chunkMinutes;
         this.aiEnabled = aiEnabled;
+        this.diarizationEnabled = diarizationEnabled;
     }
 
     public PipelineResult run(Path videoFile, Path outputDir, ProgressListener listener,
@@ -64,10 +73,30 @@ public final class TranscriptionPipeline {
             Path wav = tempDir.resolve("audio.wav");
             audioExtractor.extractToWav(videoFile, wav, handle, line -> listener.onProgress(line, -1));
 
+            // A diarização (opcional) roda em paralelo com a transcrição: ambas leem o mesmo WAV,
+            // como processos/tarefas independentes.
+            Future<List<SpeakerTurn>> diarizationFuture = null;
+            ExecutorService diarizationExecutor = null;
+            if (diarizationEnabled && speakerDiarizer != null) {
+                listener.onProgress("Identificando participantes em paralelo...", -1);
+                diarizationExecutor = Executors.newVirtualThreadPerTaskExecutor();
+                diarizationFuture = diarizationExecutor.submit(
+                        () -> speakerDiarizer.diarize(wav, handle, line -> listener.onProgress(line, -1)));
+            }
+
             listener.onProgress("Transcrevendo... (isso pode levar alguns minutos)", 0);
-            List<Segment> segments = chunkingEnabled
-                    ? transcribeInChunks(wav, tempDir, listener, handle)
-                    : engine.transcribe(wav, (msg, pct) -> listener.onProgress(msg, pct), handle);
+            List<Segment> segments;
+            try {
+                segments = chunkingEnabled
+                        ? transcribeInChunks(wav, tempDir, listener, handle)
+                        : engine.transcribe(wav, (msg, pct) -> listener.onProgress(msg, pct), handle);
+            } finally {
+                if (diarizationExecutor != null) {
+                    diarizationExecutor.shutdown();
+                }
+            }
+
+            List<AttributedSegment> attributed = attribute(segments, diarizationFuture, listener);
 
             Duration totalDuration = segments.isEmpty() ? Duration.ZERO
                     : segments.get(segments.size() - 1).end();
@@ -78,7 +107,7 @@ public final class TranscriptionPipeline {
 
             listener.onProgress("Gerando ata...", 95);
             Path simpleMinutes = outputDir.resolve(baseName + "-ata.docx");
-            docxGenerator.generateSimpleMinutes(simpleMinutes, metadata, segments);
+            docxGenerator.generateSimpleMinutesAttributed(simpleMinutes, metadata, attributed);
 
             Path structuredMinutes = null;
             String aiWarning = null;
@@ -88,7 +117,8 @@ public final class TranscriptionPipeline {
                     String transcriptText = String.join("\n", segments.stream().map(Segment::text).toList());
                     StructuredMinutes structured = minutesStructurer.structure(transcriptText);
                     structuredMinutes = outputDir.resolve(baseName + "-ata-estruturada.docx");
-                    docxGenerator.generateStructuredMinutes(structuredMinutes, metadata, structured, segments);
+                    docxGenerator.generateStructuredMinutesAttributed(structuredMinutes, metadata, structured,
+                            attributed);
                 } catch (MinutesStructuringException e) {
                     LOG.warn("Falha ao gerar ata estruturada com IA: {}", e.getMessage(), e);
                     aiWarning = "Não foi possível gerar a ata estruturada com IA (" + e.getMessage()
@@ -100,6 +130,30 @@ public final class TranscriptionPipeline {
             return new PipelineResult(simpleMinutes, structuredMinutes, aiWarning, segments);
         } finally {
             deleteRecursively(tempDir);
+        }
+    }
+
+    /**
+     * Waits for the (optional) diarization result and attributes speakers to the transcription.
+     * A diarization failure is non-fatal: the transcription is returned without speaker labels.
+     */
+    private List<AttributedSegment> attribute(List<Segment> segments, Future<List<SpeakerTurn>> diarizationFuture,
+            ProgressListener listener) {
+        if (diarizationFuture == null) {
+            return segments.stream().map(s -> new AttributedSegment(s, null)).toList();
+        }
+        try {
+            List<SpeakerTurn> turns = diarizationFuture.get();
+            return SpeakerAttributor.attribute(segments, turns);
+        } catch (ExecutionException e) {
+            LOG.warn("Falha na identificação de participantes: {}", e.getCause() == null
+                    ? e.getMessage() : e.getCause().getMessage());
+            listener.onProgress("Não foi possível identificar os participantes; a ata será gerada sem essa informação.",
+                    -1);
+            return segments.stream().map(s -> new AttributedSegment(s, null)).toList();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return segments.stream().map(s -> new AttributedSegment(s, null)).toList();
         }
     }
 
