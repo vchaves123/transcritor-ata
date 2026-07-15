@@ -31,11 +31,11 @@ public final class WhisperVariantSelector {
         String chosen = hasGpu ? CUDA_BINARY : CPU_BINARY;
 
         if (!locator.exists(Path.of(chosen))) {
-            LOG.debug("Build de whisper-cli em {} não encontrado; mantendo configuração existente.", chosen);
+            LOG.debug("whisper-cli build not found at {}; keeping existing configuration.", chosen);
             return;
         }
 
-        LOG.info("GPU NVIDIA {}; usando whisper-cli em {}", hasGpu ? "detectada" : "não detectada", chosen);
+        LOG.info("NVIDIA GPU {}; using whisper-cli at {}", hasGpu ? "detected" : "not detected", chosen);
         config.set(AppConfig.KEY_WHISPER_BINARY, chosen);
         config.save();
     }

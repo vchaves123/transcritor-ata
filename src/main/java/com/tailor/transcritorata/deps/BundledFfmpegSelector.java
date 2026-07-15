@@ -23,11 +23,11 @@ public final class BundledFfmpegSelector {
 
     public static void applyIfBundlePresent(AppConfig config, ExecutableLocator locator) {
         if (!locator.exists(Path.of(BUNDLED_BINARY))) {
-            LOG.debug("ffmpeg empacotado não encontrado em {}; mantendo configuração existente.",
+            LOG.debug("Bundled ffmpeg not found at {}; keeping existing configuration.",
                     BUNDLED_BINARY);
             return;
         }
-        LOG.info("Usando ffmpeg empacotado em {}", BUNDLED_BINARY);
+        LOG.info("Using bundled ffmpeg at {}", BUNDLED_BINARY);
         config.set(AppConfig.KEY_FFMPEG_BINARY, BUNDLED_BINARY);
         config.save();
     }

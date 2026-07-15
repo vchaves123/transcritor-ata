@@ -9,7 +9,7 @@ import com.tailor.transcritorata.config.AppConfig;
 
 /**
  * Checks that the external tools and models required by the transcription pipeline are present,
- * producing a list of {@link DependencyStatus} with concrete Portuguese installation instructions
+ * producing a list of {@link DependencyStatus} with concrete installation instructions
  * for whatever is missing. Never throws to the caller.
  */
 public final class DependencyChecker {
@@ -28,18 +28,12 @@ public final class DependencyChecker {
         this.locator = locator;
     }
 
-    /** Checks ffmpeg + the dependencies of the currently configured transcription engine. */
+    /** Checks ffmpeg + the Whisper binary/model. */
     public List<DependencyStatus> checkAll() {
         List<DependencyStatus> results = new ArrayList<>();
         results.add(checkFfmpeg());
-
-        String engine = config.get(AppConfig.KEY_ENGINE, "whisper");
-        if ("vosk".equalsIgnoreCase(engine)) {
-            results.add(checkVoskModel());
-        } else {
-            results.add(checkWhisperBinary());
-            results.add(checkWhisperModel());
-        }
+        results.add(checkWhisperBinary());
+        results.add(checkWhisperModel());
         return results;
     }
 
@@ -58,21 +52,21 @@ public final class DependencyChecker {
 
         if (ok) {
             return new DependencyStatus("ffmpeg", true,
-                    found.map(Path::toString).orElse("encontrado no PATH"), null, null);
+                    found.map(Path::toString).orElse("found on PATH"), null, null);
         }
         String instructions = """
-                O ffmpeg não foi encontrado. No Windows 11, a forma mais simples de instalar é abrir o \
-                Terminal/PowerShell e executar:
+                ffmpeg was not found. On Windows 11, the simplest way to install it is to open the \
+                Terminal/PowerShell and run:
 
                     winget install Gyan.FFmpeg
 
-                Alternativamente, baixe o build em https://www.gyan.dev/ffmpeg/builds/ e extraia em uma pasta \
-                (por exemplo C:\\ffmpeg), adicionando a subpasta "bin" ao PATH do sistema.
+                Alternatively, download the build from https://www.gyan.dev/ffmpeg/builds/ and extract it into a \
+                folder (e.g. C:\\ffmpeg), adding the "bin" subfolder to the system PATH.
 
-                Importante: após instalar pelo winget, feche e reabra o transcritor-ata para que o PATH \
-                atualizado seja reconhecido.
+                Important: after installing via winget, close and reopen transcritor-ata so the updated PATH \
+                is picked up.
                 """;
-        return new DependencyStatus("ffmpeg", false, "não encontrado", instructions,
+        return new DependencyStatus("ffmpeg", false, "not found", instructions,
                 "https://www.gyan.dev/ffmpeg/builds/");
     }
 
@@ -96,18 +90,18 @@ public final class DependencyChecker {
         }
 
         String instructions = """
-                O executável whisper-cli.exe não foi encontrado. Baixe o binário pré-compilado para Windows \
-                nas releases oficiais do whisper.cpp:
+                The whisper-cli.exe executable was not found. Download the prebuilt Windows binary from \
+                the official whisper.cpp releases:
 
                     https://github.com/ggml-org/whisper.cpp/releases
 
-                Procure pelo arquivo zip com sufixo "-bin-x64", extraia o conteúdo em uma pasta de sua \
-                preferência e, nas configurações do transcritor-ata, aponte o campo "whisper-cli" para o \
-                arquivo whisper-cli.exe extraído.
+                Look for the zip file with the "-bin-x64" suffix, extract its contents into a folder of your \
+                choice, and in transcritor-ata's settings, point the "whisper-cli" field to the extracted \
+                whisper-cli.exe file.
 
-                Não é necessário compilar nada.
+                There is no need to compile anything.
                 """;
-        return new DependencyStatus("whisper-cli (whisper.cpp)", false, "não encontrado", instructions,
+        return new DependencyStatus("whisper-cli (whisper.cpp)", false, "not found", instructions,
                 "https://github.com/ggml-org/whisper.cpp/releases");
     }
 
@@ -118,44 +112,22 @@ public final class DependencyChecker {
             long size = locator.sizeOf(modelPath);
             long minimumPlausibleBytes = 10L * 1024 * 1024; // any real ggml model is well above 10 MB
             if (locator.exists(modelPath) && size >= minimumPlausibleBytes) {
-                return new DependencyStatus("Modelo Whisper (.bin)", true, configured, null, null);
+                return new DependencyStatus("Whisper model (.bin)", true, configured, null, null);
             }
         }
         String instructions = """
-                Nenhum modelo Whisper válido está configurado. Baixe um modelo em formato ggml em:
+                No valid Whisper model is configured. Download a model in ggml format from:
 
                     https://huggingface.co/ggerganov/whisper.cpp/tree/main
 
-                Recomendações:
-                  - ggml-medium.bin: bom equilíbrio para uso em CPU (recomendado)
-                  - ggml-small.bin: para máquinas mais modestas
-                  - ggml-large-v3.bin: para quem possui GPU disponível
+                Recommendations:
+                  - ggml-medium.bin: good balance for CPU use (recommended)
+                  - ggml-small.bin: for more modest machines
+                  - ggml-large-v3.bin: for those with a GPU available
 
-                Salve o arquivo baixado e selecione-o no campo "Modelo Whisper" das configurações.
+                Save the downloaded file and select it in the "Whisper Model" field of the settings.
                 """;
-        return new DependencyStatus("Modelo Whisper (.bin)", false, "não configurado ou inválido", instructions,
+        return new DependencyStatus("Whisper model (.bin)", false, "not configured or invalid", instructions,
                 "https://huggingface.co/ggerganov/whisper.cpp/tree/main");
-    }
-
-    public DependencyStatus checkVoskModel() {
-        String configured = config.get(AppConfig.KEY_VOSK_MODEL_DIR, "");
-        if (!configured.isBlank()) {
-            Path dir = Path.of(configured);
-            if (java.nio.file.Files.isDirectory(dir)) {
-                return new DependencyStatus("Modelo Vosk", true, configured, null, null);
-            }
-        }
-        String instructions = """
-                Nenhum modelo Vosk válido está configurado. Baixe um modelo em português em:
-
-                    https://alphacephei.com/vosk/models
-
-                Recomendação: vosk-model-small-pt-0.3
-
-                Descompacte o arquivo baixado e selecione a pasta resultante no campo "Modelo Vosk" das \
-                configurações.
-                """;
-        return new DependencyStatus("Modelo Vosk", false, "não configurado", instructions,
-                "https://alphacephei.com/vosk/models");
     }
 }

@@ -40,7 +40,7 @@ public final class WhisperModelDownloader {
         Path target = targetDir.resolve(option.fileName());
         Path partial = targetDir.resolve(option.fileName() + ".part");
 
-        LOG.info("Baixando modelo Whisper {} de {}", option.fileName(), option.downloadUrl());
+        LOG.info("Downloading Whisper model {} from {}", option.fileName(), option.downloadUrl());
 
         HttpClient client = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
@@ -50,7 +50,7 @@ public final class WhisperModelDownloader {
         try {
             HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
             if (response.statusCode() != 200) {
-                throw new IOException("Falha ao baixar o modelo (HTTP " + response.statusCode() + ").");
+                throw new IOException("Failed to download the model (HTTP " + response.statusCode() + ").");
             }
             long total = response.headers().firstValueAsLong("Content-Length").orElse(-1);
 
@@ -61,7 +61,7 @@ public final class WhisperModelDownloader {
                 int read;
                 while ((read = in.read(buffer)) != -1) {
                     if (cancelled.get()) {
-                        throw new IOException("Download cancelado pelo usuário.");
+                        throw new IOException("Download cancelled by the user.");
                     }
                     out.write(buffer, 0, read);
                     downloaded += read;
@@ -78,7 +78,7 @@ public final class WhisperModelDownloader {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             Files.deleteIfExists(partial);
-            throw new IOException("Download interrompido: " + e.getMessage(), e);
+            throw new IOException("Download interrupted: " + e.getMessage(), e);
         }
     }
 }

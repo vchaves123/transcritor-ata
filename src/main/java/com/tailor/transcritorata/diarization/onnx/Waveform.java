@@ -44,7 +44,7 @@ public final class Waveform {
             }
             return samples;
         } catch (UnsupportedAudioFileException e) {
-            throw new IOException("Formato de áudio não suportado: " + e.getMessage(), e);
+            throw new IOException("Unsupported audio format: " + e.getMessage(), e);
         }
     }
 }

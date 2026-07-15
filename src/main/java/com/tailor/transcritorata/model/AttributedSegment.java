@@ -4,7 +4,7 @@ package com.tailor.transcritorata.model;
  * A transcribed {@link Segment} optionally attributed to a speaker.
  *
  * @param segment      the underlying transcription segment
- * @param speakerLabel friendly speaker name (e.g. "Pessoa 1"), or {@code null} when diarization
+ * @param speakerLabel friendly speaker name (e.g. "Speaker 1"), or {@code null} when diarization
  *                     was not performed
  */
 public record AttributedSegment(Segment segment, String speakerLabel) {

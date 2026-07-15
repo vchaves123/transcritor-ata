@@ -22,16 +22,13 @@ public final class AppConfig {
     private static final Logger LOG = LoggerFactory.getLogger(AppConfig.class);
     private static final String FILE_NAME = "config.properties";
 
-    public static final String KEY_ENGINE = "engine";
     public static final String KEY_FFMPEG_BINARY = "ffmpeg.binary";
     public static final String KEY_WHISPER_BINARY = "whisper.binary";
     public static final String KEY_WHISPER_MODEL = "whisper.model";
     public static final String KEY_WHISPER_FAST_MODE = "whisper.fastMode";
-    public static final String KEY_VOSK_MODEL_DIR = "vosk.modelDir";
     public static final String KEY_LAST_VIDEO_DIR = "lastVideoDir";
+    public static final String KEY_OUTPUT_DIR = "outputDir";
     public static final String KEY_COMPANY_NAME = "docx.companyName";
-    public static final String KEY_CHUNK_MINUTES = "audio.chunkMinutes";
-    public static final String KEY_CHUNK_ENABLED = "audio.chunkEnabled";
     public static final String KEY_PROCESS_TIMEOUT_SECONDS = "process.timeoutSeconds";
     public static final String KEY_AI_ENABLED = "ai.enabled";
     public static final String KEY_AI_MODEL = "ai.model";
@@ -72,16 +69,13 @@ public final class AppConfig {
         try (InputStream in = Files.newInputStream(configFile)) {
             properties.load(in);
         } catch (IOException e) {
-            LOG.warn("Não foi possível ler o arquivo de configuração {}: {}", configFile, e.getMessage());
+            LOG.warn("Could not read config file {}: {}", configFile, e.getMessage());
         }
     }
 
     private void applyDefaults() {
-        properties.putIfAbsent(KEY_ENGINE, "whisper");
         properties.putIfAbsent(KEY_FFMPEG_BINARY, "ffmpeg");
         properties.putIfAbsent(KEY_WHISPER_FAST_MODE, "false");
-        properties.putIfAbsent(KEY_CHUNK_MINUTES, "20");
-        properties.putIfAbsent(KEY_CHUNK_ENABLED, "false");
         properties.putIfAbsent(KEY_PROCESS_TIMEOUT_SECONDS, "3600");
         properties.putIfAbsent(KEY_AI_ENABLED, "false");
         properties.putIfAbsent(KEY_AI_MODEL, "claude-sonnet-4-6");
@@ -95,10 +89,10 @@ public final class AppConfig {
         try {
             Files.createDirectories(configFile.getParent());
             try (OutputStream out = Files.newOutputStream(configFile)) {
-                properties.store(out, "Configuracao do transcritor-ata - gerado automaticamente");
+                properties.store(out, "transcritor-ata configuration - auto-generated");
             }
         } catch (IOException e) {
-            LOG.warn("Não foi possível salvar o arquivo de configuração {}: {}", configFile, e.getMessage());
+            LOG.warn("Could not save config file {}: {}", configFile, e.getMessage());
         }
     }
 

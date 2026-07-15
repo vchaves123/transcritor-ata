@@ -23,23 +23,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DocxMinutesGeneratorTest {
 
     private static final MeetingMetadata METADATA = new MeetingMetadata(
-            LocalDate.of(2026, 7, 10), "reuniao-diretoria.wmv", Duration.ofMinutes(45), "Tailor");
+            LocalDate.of(2026, 7, 10), "board-meeting.wmv", Duration.ofMinutes(45), "Tailor");
 
     private static final List<Segment> SEGMENTS = List.of(
-            new Segment(Duration.ZERO, Duration.ofSeconds(5), "Bom dia a todos."),
-            new Segment(Duration.ofSeconds(5), Duration.ofSeconds(12), "Vamos revisar o cronograma."));
+            new Segment(Duration.ZERO, Duration.ofSeconds(5), "Good morning, everyone."),
+            new Segment(Duration.ofSeconds(5), Duration.ofSeconds(12), "Let's review the schedule."));
 
     @Test
     void generatesSimpleMinutesWithTitleMetadataAndSegments(@TempDir Path tempDir) throws IOException {
-        Path output = tempDir.resolve("ata.docx");
+        Path output = tempDir.resolve("minutes.docx");
         new DocxMinutesGenerator("Tailor").generateSimpleMinutes(output, METADATA, SEGMENTS);
 
         try (XWPFDocument document = new XWPFDocument(java.nio.file.Files.newInputStream(output))) {
             String fullText = extractText(document);
-            assertTrue(fullText.contains("Ata de Reunião"));
-            assertTrue(fullText.contains("reuniao-diretoria.wmv"));
+            assertTrue(fullText.contains("Meeting Minutes"));
+            assertTrue(fullText.contains("board-meeting.wmv"));
             assertTrue(fullText.contains("00:45:00") || fullText.contains("00:45"));
-            assertTrue(fullText.contains("Bom dia a todos."));
+            assertTrue(fullText.contains("Good morning, everyone."));
             assertTrue(fullText.contains("[00:00:05]"));
         }
     }
@@ -47,33 +47,33 @@ class DocxMinutesGeneratorTest {
     @Test
     void generatesStructuredMinutesWithActionItemsTable(@TempDir Path tempDir) throws IOException {
         StructuredMinutes structured = new StructuredMinutes(
-                "Discussão sobre o cronograma do projeto.",
-                List.of("Maria", "João"),
-                List.of("Revisão de escopo", "Riscos"),
-                List.of("Adiar entrega para agosto"),
-                List.of(new ActionItem("Atualizar cronograma", "Maria", "2026-07-20")));
+                "Discussion about the project schedule.",
+                List.of("Maria", "John"),
+                List.of("Scope review", "Risks"),
+                List.of("Postpone delivery to August"),
+                List.of(new ActionItem("Update schedule", "Maria", "2026-07-20")));
 
-        Path output = tempDir.resolve("ata-estruturada.docx");
+        Path output = tempDir.resolve("minutes-structured.docx");
         new DocxMinutesGenerator("Tailor").generateStructuredMinutes(output, METADATA, structured, SEGMENTS);
 
         try (XWPFDocument document = new XWPFDocument(java.nio.file.Files.newInputStream(output))) {
             String fullText = extractText(document);
-            assertTrue(fullText.contains("Ata de Reunião Estruturada"));
-            assertTrue(fullText.contains("Discussão sobre o cronograma do projeto."));
+            assertTrue(fullText.contains("Structured Meeting Minutes"));
+            assertTrue(fullText.contains("Discussion about the project schedule."));
             assertTrue(fullText.contains("Maria"));
-            assertTrue(fullText.contains("Revisão de escopo"));
-            assertTrue(fullText.contains("Adiar entrega para agosto"));
+            assertTrue(fullText.contains("Scope review"));
+            assertTrue(fullText.contains("Postpone delivery to August"));
 
             List<XWPFTable> tables = document.getTables();
             boolean foundActionTable = tables.stream().anyMatch(t ->
-                    t.getRow(0).getCell(0).getText().equals("Ação")
-                            && t.getRow(0).getCell(1).getText().equals("Responsável")
-                            && t.getRow(0).getCell(2).getText().equals("Prazo"));
-            assertTrue(foundActionTable, "Deveria conter a tabela de acoes com o cabecalho esperado");
+                    t.getRow(0).getCell(0).getText().equals("Action")
+                            && t.getRow(0).getCell(1).getText().equals("Owner")
+                            && t.getRow(0).getCell(2).getText().equals("Due Date"));
+            assertTrue(foundActionTable, "Should contain the action items table with the expected header");
 
             XWPFTable actionTable = tables.stream().filter(t ->
-                    t.getRow(0).getCell(0).getText().equals("Ação")).findFirst().orElseThrow();
-            assertEquals("Atualizar cronograma", actionTable.getRow(1).getCell(0).getText());
+                    t.getRow(0).getCell(0).getText().equals("Action")).findFirst().orElseThrow();
+            assertEquals("Update schedule", actionTable.getRow(1).getCell(0).getText());
             assertEquals("Maria", actionTable.getRow(1).getCell(1).getText());
             assertEquals("2026-07-20", actionTable.getRow(1).getCell(2).getText());
         }
@@ -82,17 +82,17 @@ class DocxMinutesGeneratorTest {
     @Test
     void includesSpeakerLabelsWhenSegmentsAreAttributed(@TempDir Path tempDir) throws IOException {
         List<AttributedSegment> attributed = List.of(
-                new AttributedSegment(SEGMENTS.get(0), "Pessoa 1"),
-                new AttributedSegment(SEGMENTS.get(1), "Pessoa 2"));
+                new AttributedSegment(SEGMENTS.get(0), "Speaker 1"),
+                new AttributedSegment(SEGMENTS.get(1), "Speaker 2"));
 
-        Path output = tempDir.resolve("ata-locutores.docx");
+        Path output = tempDir.resolve("minutes-speakers.docx");
         new DocxMinutesGenerator("Tailor").generateSimpleMinutesAttributed(output, METADATA, attributed);
 
         try (XWPFDocument document = new XWPFDocument(java.nio.file.Files.newInputStream(output))) {
             String fullText = extractText(document);
-            assertTrue(fullText.contains("Pessoa 1"), "deve conter o rótulo do primeiro locutor");
-            assertTrue(fullText.contains("Pessoa 2"), "deve conter o rótulo do segundo locutor");
-            assertTrue(fullText.contains("Bom dia a todos."));
+            assertTrue(fullText.contains("Speaker 1"), "should contain the first speaker's label");
+            assertTrue(fullText.contains("Speaker 2"), "should contain the second speaker's label");
+            assertTrue(fullText.contains("Good morning, everyone."));
         }
     }
 

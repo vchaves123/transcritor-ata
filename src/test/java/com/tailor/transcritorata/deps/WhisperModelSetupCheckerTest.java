@@ -37,15 +37,6 @@ class WhisperModelSetupCheckerTest {
     }
 
     @Test
-    void isNotNeededWhenEngineIsVosk(@TempDir Path tempDir) {
-        AppConfig config = new AppConfig(tempDir.resolve("config.properties"));
-        config.set(AppConfig.KEY_ENGINE, "vosk");
-        ExecutableLocator locator = mock(ExecutableLocator.class);
-
-        assertFalse(WhisperModelSetupChecker.isNeeded(config, locator));
-    }
-
-    @Test
     void isNeededWhenConfiguredModelFileIsMissing(@TempDir Path tempDir) {
         AppConfig config = new AppConfig(tempDir.resolve("config.properties"));
         Path modelPath = Path.of("tools/models/ggml-medium.bin");

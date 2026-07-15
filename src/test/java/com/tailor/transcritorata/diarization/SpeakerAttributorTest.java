@@ -25,9 +25,9 @@ class SpeakerAttributorTest {
     @Test
     void assignsSegmentToSpeakerWithLargestOverlapAndMapsToFriendlyNames() {
         List<Segment> segments = List.of(
-                segment(0, 5, "primeira fala"),
-                segment(6, 10, "segunda fala"),
-                segment(11, 15, "terceira fala"));
+                segment(0, 5, "first utterance"),
+                segment(6, 10, "second utterance"),
+                segment(11, 15, "third utterance"));
 
         List<SpeakerTurn> turns = List.of(
                 turn(0, 5, "S0"),
@@ -36,26 +36,26 @@ class SpeakerAttributorTest {
 
         List<AttributedSegment> attributed = SpeakerAttributor.attribute(segments, turns);
 
-        // S0 aparece primeiro -> "Pessoa 1"; S1 depois -> "Pessoa 2"; S0 reaparece -> continua "Pessoa 1"
-        assertEquals("Pessoa 1", attributed.get(0).speakerLabel());
-        assertEquals("Pessoa 2", attributed.get(1).speakerLabel());
-        assertEquals("Pessoa 1", attributed.get(2).speakerLabel());
+        // S0 appears first -> "Speaker 1"; S1 next -> "Speaker 2"; S0 reappears -> stays "Speaker 1"
+        assertEquals("Speaker 1", attributed.get(0).speakerLabel());
+        assertEquals("Speaker 2", attributed.get(1).speakerLabel());
+        assertEquals("Speaker 1", attributed.get(2).speakerLabel());
     }
 
     @Test
     void choosesSpeakerWithMoreOverlapWhenSegmentSpansTwoTurns() {
-        // segmento 0..10; S0 cobre 0..3, S1 cobre 3..10 -> S1 tem mais sobreposição
-        List<Segment> segments = List.of(segment(0, 10, "fala sobreposta"));
+        // segment 0..10; S0 covers 0..3, S1 covers 3..10 -> S1 has more overlap
+        List<Segment> segments = List.of(segment(0, 10, "overlapping speech"));
         List<SpeakerTurn> turns = List.of(turn(0, 3, "S0"), turn(3, 10, "S1"));
 
         List<AttributedSegment> attributed = SpeakerAttributor.attribute(segments, turns);
 
-        assertEquals("Pessoa 1", attributed.get(0).speakerLabel());
+        assertEquals("Speaker 1", attributed.get(0).speakerLabel());
     }
 
     @Test
     void leavesSpeakerNullWhenNoTurnOverlaps() {
-        List<Segment> segments = List.of(segment(20, 25, "fala isolada"));
+        List<Segment> segments = List.of(segment(20, 25, "isolated speech"));
         List<SpeakerTurn> turns = List.of(turn(0, 5, "S0"));
 
         List<AttributedSegment> attributed = SpeakerAttributor.attribute(segments, turns);
@@ -66,7 +66,7 @@ class SpeakerAttributorTest {
 
     @Test
     void handlesEmptyTurnsGracefully() {
-        List<Segment> segments = List.of(segment(0, 5, "fala"));
+        List<Segment> segments = List.of(segment(0, 5, "speech"));
         List<AttributedSegment> attributed = SpeakerAttributor.attribute(segments, List.of());
 
         assertEquals(1, attributed.size());

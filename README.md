@@ -1,204 +1,198 @@
 # transcritor-ata
 
-Aplicação desktop para transcrever gravações de reuniões (`.wmv`, `.mp4`, `.mkv`, `.avi`, entre
-outros formatos suportados pelo ffmpeg) e gerar automaticamente uma **ata em `.docx` com
-aparência profissional**, pronta para envio a clientes.
+Desktop application for transcribing meeting recordings (`.wmv`, `.mp4`, `.mkv`, `.avi`, among
+other formats supported by ffmpeg) and automatically generating a **professional-looking minutes
+document in `.docx`**, ready to send to clients.
 
-Feita para **usuários não técnicos**: a interface é toda em português, com um verificador de
-instalação que explica passo a passo o que falta configurar.
+Built for **non-technical users**: the interface is fully in English, with an installation
+checker that explains step by step what still needs to be configured.
 
-## Público-alvo
+## Target audience
 
-Equipes que gravam reuniões em vídeo e precisam transformar essas gravações em atas escritas,
-sem precisar editar vídeo, usar linha de comando ou conhecer ferramentas de IA.
+Teams that record meetings on video and need to turn those recordings into written minutes,
+without needing to edit video, use the command line, or know AI tools.
 
-## Como funciona (visão geral do fluxo)
+## How it works (workflow overview)
 
-1. Escolha o arquivo de vídeo da reunião.
-2. Escolha o motor de transcrição (Whisper, recomendado, ou Vosk).
-3. Clique em "Transcrever". O programa extrai o áudio, transcreve e gera a ata.
-4. Ao final, abra a ata `.docx` diretamente pela própria aplicação.
-5. Opcionalmente, habilite a geração de uma **ata estruturada com IA** (resumo executivo,
-   participantes, pauta, decisões e tabela de ações), usando a API da Anthropic (Claude).
+1. Choose one or more meeting video files (in the order they should be concatenated).
+2. Click "Transcribe". The program extracts the audio, transcribes it, and generates the minutes.
+4. When finished, open the `.docx` minutes directly from the application.
+5. Optionally, enable generation of **AI-structured minutes** (executive summary, participants,
+   agenda, decisions, and an action table), using the Anthropic (Claude) API.
 
-## Pré-requisitos (Windows 11)
+## Prerequisites (Windows 11)
 
-A aplicação verifica tudo isso automaticamente ao abrir (menu **Ajuda → Verificar instalação**),
-mostrando links e instruções para o que estiver faltando. Os requisitos são:
+The application checks all of this automatically on startup (menu **Help → Verify installation**),
+showing links and instructions for anything that's missing. The requirements are:
 
 ### 1. ffmpeg
 
-Necessário para extrair o áudio dos vídeos. Instale pelo Terminal/PowerShell:
+Required to extract audio from videos. Install via Terminal/PowerShell:
 
 ```
 winget install Gyan.FFmpeg
 ```
 
-Alternativa: baixe em https://www.gyan.dev/ffmpeg/builds/ e adicione a pasta `bin` ao PATH.
+Alternative: download from https://www.gyan.dev/ffmpeg/builds/ and add the `bin` folder to PATH.
 
-> Após instalar pelo winget, feche e reabra o transcritor-ata para que o PATH atualizado seja
-> reconhecido.
+> After installing via winget, close and reopen transcritor-ata so the updated PATH is
+> recognized.
 
-**Alternativa "empacotada"**: se você extrair um build estático do ffmpeg para Windows (ex.:
-https://github.com/BtbN/FFmpeg-Builds/releases, asset `*-win64-lgpl.zip`) em `tools/ffmpeg/` na
-raiz do projeto, de forma que o executável fique em `tools/ffmpeg/bin/ffmpeg.exe`, a aplicação
-detecta e usa esse caminho automaticamente a cada inicialização — sem precisar mexer no PATH do
-sistema. Essa pasta fica fora do controle de versão (`.gitignore`).
+**"Bundled" alternative**: if you extract a static Windows ffmpeg build (e.g.:
+https://github.com/BtbN/FFmpeg-Builds/releases, asset `*-win64-lgpl.zip`) into `tools/ffmpeg/` at
+the project root, so that the executable ends up at `tools/ffmpeg/bin/ffmpeg.exe`, the application
+detects and uses that path automatically on every startup — no need to touch the system PATH.
+This folder is excluded from version control (`.gitignore`).
 
-### 2. whisper.cpp (motor de transcrição recomendado)
+### 2. whisper.cpp (recommended transcription engine)
 
-Baixe o binário pré-compilado para Windows nas releases oficiais:
+Download the pre-built Windows binary from the official releases:
 
 https://github.com/ggml-org/whisper.cpp/releases
 
-Procure o arquivo `.zip` com sufixo `-bin-x64`, extraia em uma pasta de sua preferência e, nas
-preferências do transcritor-ata, aponte o campo do executável para o `whisper-cli.exe` extraído.
-**Não é necessário compilar nada.**
+Look for the `.zip` file with the `-bin-x64` suffix, extract it to a folder of your choice, and,
+in transcritor-ata's preferences, point the executable field to the extracted `whisper-cli.exe`.
+**No compilation required.**
 
-**Detecção automática de GPU**: se você extrair os builds nas pastas `tools/whisper-cpu/` e
-`tools/whisper-cuda/` na raiz do projeto (mesmo layout dos `.zip` `whisper-bin-x64` e
-`whisper-cublas-*-bin-x64`, respectivamente), a aplicação detecta em tempo de execução se há uma
-GPU NVIDIA disponível (via `nvidia-smi`) e ajusta automaticamente o executável configurado a cada
-inicialização — cuBLAS quando há GPU, CPU quando não há. Essas pastas ficam fora do controle de
-versão (`.gitignore`) por serem binários grandes de terceiros; baixe-as você mesmo se quiser esse
-comportamento automático, ou configure manualmente um único caminho fixo nas preferências.
+**Automatic GPU detection**: if you extract the builds into the `tools/whisper-cpu/` and
+`tools/whisper-cuda/` folders at the project root (same layout as the `whisper-bin-x64` and
+`whisper-cublas-*-bin-x64` `.zip` files, respectively), the application detects at runtime whether
+an NVIDIA GPU is available (via `nvidia-smi`) and automatically adjusts the configured executable
+on every startup — cuBLAS when a GPU is present, CPU when it isn't. These folders are excluded
+from version control (`.gitignore`) because they are large third-party binaries; download them
+yourself if you want this automatic behavior, or manually configure a single fixed path in the
+preferences.
 
-**GPU com pouca VRAM (2 GB ou menos)**: se a transcrição falhar por falta de memória na GPU com
-modelos maiores (`medium`, `large-v3`), marque a opção "Priorizar velocidade e uso de memória da
-GPU" nas Preferências. Ela troca a busca em feixe (beam search, padrão do whisper.cpp) por
-decodificação gulosa, usando bem menos VRAM e sendo mais rápida, ao custo de um pouco de precisão.
-Além disso, o app já tenta automaticamente transcrever de novo usando a CPU se a GPU ficar sem
-memória no meio de uma transcrição.
+**Low-VRAM GPU (2 GB or less)**: if transcription fails due to insufficient GPU memory with larger
+models (`medium`, `large-v3`), check the "Prioritize speed and GPU memory usage" option in
+Preferences. It swaps beam search (whisper.cpp's default) for greedy decoding, which uses
+significantly less VRAM and is faster, at the cost of some accuracy. In addition, the app already
+automatically retries transcription on the CPU if the GPU runs out of memory mid-transcription.
 
-### 3. Um modelo Whisper (`.bin`)
+### 3. A Whisper model (`.bin`)
 
-**Não precisa baixar manualmente**: na primeira vez que a aplicação abrir sem um modelo válido
-configurado, aparece um diálogo oferecendo três opções (pequeno, médio — recomendado, ou grande),
-com tamanho aproximado e descrição de cada um. Ao escolher e clicar em "Baixar", o modelo é
-baixado automaticamente para `tools/models/` e as preferências são ajustadas sozinhas. Dá para
-"Pular por agora" e configurar manualmente depois.
+**No need to download it manually**: the first time the application opens without a valid model
+configured, a dialog appears offering three options (small, medium — recommended, or large), with
+the approximate size and description of each. After choosing one and clicking "Download", the
+model is downloaded automatically to `tools/models/` and the preferences are adjusted
+automatically. You can also "Skip for now" and configure it manually later.
 
-Se preferir baixar você mesmo: https://huggingface.co/ggerganov/whisper.cpp/tree/main
+If you'd rather download it yourself: https://huggingface.co/ggerganov/whisper.cpp/tree/main
 
-- `ggml-medium.bin` — recomendado, bom equilíbrio para uso em CPU.
-- `ggml-small.bin` — para máquinas mais modestas.
-- `ggml-large-v3.bin` — para quem tem GPU disponível.
+- `ggml-medium.bin` — recommended, good balance for CPU use.
+- `ggml-small.bin` — for more modest machines.
+- `ggml-large-v3.bin` — for those with a GPU available.
 
-Salve o arquivo e selecione-o nas preferências da aplicação.
+Save the file and select it in the application's preferences.
 
-### 4. (Alternativa offline leve) Vosk
+### 4. (Optional, paid) Anthropic API key
 
-Caso prefira o motor Vosk em vez do Whisper, baixe um modelo em português em
-https://alphacephei.com/vosk/models (recomendado: `vosk-model-small-pt-0.3`), descompacte e
-selecione a pasta nas preferências.
+Only needed if you want to use the **AI-structured minutes** feature. Without it, the program
+works 100% offline. Get a key at https://console.anthropic.com — usage is billed by Anthropic
+based on consumption. Configure it via the `ANTHROPIC_API_KEY` environment variable or in the
+corresponding preferences field.
 
-### 5. (Opcional, pago) Chave da API da Anthropic
+### 5. (Optional, experimental) Speaker identification
 
-Só é necessária se você quiser usar o recurso de **ata estruturada com IA**. Sem ela, o programa
-funciona 100% offline. Obtenha uma chave em https://console.anthropic.com — o uso é cobrado pela
-Anthropic conforme o consumo. Configure via variável de ambiente `ANTHROPIC_API_KEY` ou no campo
-correspondente das preferências.
+No extra installation or download is required. Simply check the "Identify speakers in the
+transcription (experimental)" checkbox before transcribing, so the minutes indicate who spoke
+each segment (`Speaker 1`, `Speaker 2`, ...).
 
-### 6. (Opcional, experimental) Identificação de participantes
+This feature runs **entirely within the program itself**, with no external process: it's a Java
+reimplementation of the neural pipeline [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1)
+(segmentation + speaker embeddings + hierarchical clustering), running via
+[ONNX Runtime](https://onnxruntime.ai/). The models (~32 MB) are already embedded in the
+application's jar.
 
-Nenhuma instalação ou download extra é necessário. Basta marcar o checkbox "Identificar
-participantes na transcrição (experimental)" antes de transcrever, para que a ata indique quem
-falou cada trecho (`Pessoa 1`, `Pessoa 2`, ...).
+> It's significantly more accurate than the previous solution based on LIUM_SpkDiarization
+> (classic, non-neural), but it's still experimental — accuracy can vary depending on the number
+> of participants, audio quality, and overlapping speech. If it fails, the minutes are generated
+> normally, just without speaker labels.
 
-Esse recurso roda **inteiramente dentro do próprio programa**, sem nenhum processo externo: é uma
-reimplementação em Java do pipeline neural [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1)
-(segmentação + embeddings de locutor + clustering hierárquico), executada via
-[ONNX Runtime](https://onnxruntime.ai/). Os modelos (~32 MB) já vêm embutidos no jar da aplicação.
+## Build and run
 
-> É bem mais preciso que a solução anterior baseada no LIUM_SpkDiarization (clássica, não neural),
-> mas ainda é experimental — a precisão pode variar conforme o número de participantes, a
-> qualidade do áudio e a sobreposição de falas. Se falhar, a ata é gerada normalmente, apenas sem
-> os rótulos de locutor.
-
-## Compilar e executar
-
-Requer **JDK 21** e **Maven**.
+Requires **JDK 21** and **Maven**.
 
 ```
 mvn package
 java -jar target/transcritor-ata.jar
 ```
 
-O jar gerado (`target/transcritor-ata.jar`) já inclui todas as dependências (fat-jar).
+The generated jar (`target/transcritor-ata.jar`) already includes all dependencies (fat-jar).
 
-> No Windows, o SWT roda normalmente na thread principal. A flag `-XstartOnFirstThread` só é
-> necessária no macOS — não se aplica ao uso normal desta aplicação no Windows.
+> On Windows, SWT runs normally on the main thread. The `-XstartOnFirstThread` flag is only
+> needed on macOS — it doesn't apply to normal use of this application on Windows.
 
-## Versão portável (release para usuários finais)
+## Portable version (end-user release)
 
-Para usuários não técnicos, a forma recomendada de usar o transcritor-ata é a **versão portável**:
-um `.zip` que não precisa de instalação nem de privilégios de administrador — basta descompactar
-em qualquer pasta e executar `transcritor-ata.exe`. Já vem com:
+For non-technical users, the recommended way to use transcritor-ata is the **portable version**:
+a `.zip` that requires no installation and no administrator privileges — just unzip it into any
+folder and run `transcritor-ata.exe`. It already includes:
 
-- Um runtime Java próprio (não precisa ter Java instalado).
+- A dedicated Java runtime (no need to have Java installed).
 - ffmpeg.
-- whisper-cli (builds CPU e GPU/CUDA — a aplicação escolhe automaticamente conforme sua placa de
-  vídeo, a cada inicialização).
-- Identificação de participantes (modelos ONNX embutidos no próprio jar, opcional).
+- whisper-cli (CPU and GPU/CUDA builds — the application automatically picks the right one based
+  on your video card, on every startup).
+- Speaker identification (ONNX models embedded in the jar itself, optional).
 
-**Não vem incluído**: o modelo de transcrição Whisper (`.bin`) — na primeira execução, um diálogo
-deixa você escolher o tamanho e baixa automaticamente.
+**Not included**: the Whisper transcription model (`.bin`) — on first run, a dialog lets you
+choose the size and downloads it automatically.
 
-Baixe a versão mais recente na aba [Releases](../../releases) deste repositório.
+Download the latest version from the [Releases](../../releases) tab of this repository.
 
-### Gerando o pacote portável você mesmo
+### Building the portable package yourself
 
-Requer JDK 21 (com `jpackage` no PATH), Maven, e a pasta `tools/` já populada com ffmpeg e
-whisper-cli (veja os pré-requisitos acima — o jeito mais fácil é rodar a própria aplicação uma
-vez, que já baixa/organiza tudo isso automaticamente na estrutura esperada).
+Requires JDK 21 (with `jpackage` on the PATH), Maven, and the `tools/` folder already populated
+with ffmpeg and whisper-cli (see the prerequisites above — the easiest way is to run the
+application itself once, which already downloads/organizes all of this into the expected
+structure).
 
 ```powershell
 .\package-portable.ps1
 ```
 
-Isso compila o projeto, gera um app-image com `jpackage`, empacota junto as ferramentas externas
-(sem o modelo Whisper) e produz `transcritor-ata-portable-win64-<versão>.zip` na raiz do projeto.
-Esse `.zip` **não é versionado no git** (é grande demais) — publique-o como asset de uma
-[GitHub Release](../../releases) em vez de commitá-lo.
+This compiles the project, generates an app-image with `jpackage`, bundles the external tools
+alongside it (without the Whisper model), and produces
+`transcritor-ata-portable-win64-<version>.zip` at the project root. This `.zip` **is not tracked
+in git** (it's too large) — publish it as an asset of a [GitHub Release](../../releases) instead
+of committing it.
 
-## Importar no Eclipse
+## Importing into Eclipse
 
-`File → Import → Maven → Existing Maven Projects`, selecione a pasta do projeto. O m2e resolve
-as dependências automaticamente, incluindo o profile do SWT correto para o seu sistema
-operacional (Windows por padrão).
+`File → Import → Maven → Existing Maven Projects`, select the project folder. m2e resolves the
+dependencies automatically, including the correct SWT profile for your operating system (Windows
+by default).
 
-## Estrutura do projeto
+## Project structure
 
-- `gui` — janela principal e diálogos SWT.
-- `audio` — extração de áudio via ffmpeg e execução de processos externos.
-- `transcription` — motores de transcrição (Whisper.cpp, Vosk) e o pipeline orquestrador.
-- `minutes` — geração das atas em `.docx` (Apache POI).
-- `ai` — integração opcional com a API da Anthropic para a ata estruturada.
-- `diarization` — identificação opcional de participantes (pipeline neural via ONNX Runtime).
-- `deps` — verificador de dependências.
-- `config` — preferências do usuário.
+- `gui` — main window and SWT dialogs.
+- `audio` — audio extraction via ffmpeg and external process execution.
+- `transcription` — transcription engine (Whisper.cpp) and the orchestrating pipeline.
+- `minutes` — generation of `.docx` minutes (Apache POI).
+- `ai` — optional integration with the Anthropic API for AI-structured minutes.
+- `diarization` — optional speaker identification (neural pipeline via ONNX Runtime).
+- `deps` — dependency checker.
+- `config` — user preferences.
 
-## Onde ficam os dados do usuário
+## Where user data is stored
 
-- Configuração: `%APPDATA%\transcritor-ata\config.properties`
+- Configuration: `%APPDATA%\transcritor-ata\config.properties`
 - Logs: `%APPDATA%\transcritor-ata\logs\`
 
-## Limitações conhecidas
+## Known limitations
 
-- A identificação de participantes (diarização) é opcional e experimental — a precisão pode
-  variar bastante conforme a gravação. Veja o item 6 dos pré-requisitos.
-- Não há instalador (`.msi`/`.exe`); a distribuição é via jar executável.
-- Os estilos da ata são definidos em código (`DocxMinutesGenerator`), sem uso de um template
-  `.dotx` corporativo — a classe já foi estruturada para essa evolução futura.
-- O motor Vosk é mais leve, porém menos preciso que o Whisper, e não gera pontuação tão rica.
-- A geração de ata estruturada com IA depende de conexão com a internet e de uma chave de API
-  paga da Anthropic.
+- Speaker identification (diarization) is optional and experimental — accuracy can vary
+  considerably depending on the recording. See item 5 of the prerequisites.
+- There is no installer (`.msi`/`.exe`); distribution is via an executable jar.
+- The minutes' styles are defined in code (`DocxMinutesGenerator`), without using a corporate
+  `.dotx` template — the class has already been structured for this future evolution.
+- AI-structured minutes generation requires an internet connection and a paid Anthropic API key.
 
-## Testes
+## Tests
 
 ```
 mvn test
 ```
 
-Os testes não exigem ffmpeg, whisper.cpp, modelos ou uma chave de API real — processos externos
-e a integração com IA são isolados atrás de interfaces e testados com mocks/fixtures.
+Tests don't require ffmpeg, whisper.cpp, models, or a real API key — external processes and the
+AI integration are isolated behind interfaces and tested with mocks/fixtures.

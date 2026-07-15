@@ -40,7 +40,7 @@ public final class OnnxSpeakerDiarizer implements SpeakerDiarizer {
     @Override
     public List<SpeakerTurn> diarize(Path wav, ProcessRunner.Handle handle, Consumer<String> logLineListener)
             throws DiarizationException {
-        log(logLineListener, "Carregando modelos de identificação de participantes (ONNX)...");
+        log(logLineListener, "Loading participant identification models (ONNX)...");
         try {
             float[] waveform = Waveform.readMono16k(wav);
             OrtEnvironment env = OrtEnvironment.getEnvironment();
@@ -48,22 +48,22 @@ public final class OnnxSpeakerDiarizer implements SpeakerDiarizer {
             List<TimeSpan> spans;
             try (OnnxSegmentationModel segmentationModel =
                     new OnnxSegmentationModel(env, readResource("/models/segmentation.onnx"))) {
-                log(logLineListener, "Identificando trechos de fala...");
+                log(logLineListener, "Identifying speech segments...");
                 spans = segmentationModel.run(waveform);
             }
 
             if (handle != null && handle.isCancelled()) {
-                throw new DiarizationException("Identificação de participantes cancelada.");
+                throw new DiarizationException("Participant identification cancelled.");
             }
 
             List<float[]> embeddings = new ArrayList<>();
             List<TimeSpan> validSpans = new ArrayList<>();
             try (OnnxEmbeddingModel embeddingModel =
                     new OnnxEmbeddingModel(env, readResource("/models/embedding.onnx"))) {
-                log(logLineListener, "Extraindo características de voz de " + spans.size() + " trecho(s)...");
+                log(logLineListener, "Extracting voice features from " + spans.size() + " segment(s)...");
                 for (TimeSpan span : spans) {
                     if (handle != null && handle.isCancelled()) {
-                        throw new DiarizationException("Identificação de participantes cancelada.");
+                        throw new DiarizationException("Participant identification cancelled.");
                     }
                     int startSample = Math.max(0, (int) (span.startSeconds() * SAMPLE_RATE));
                     int endSample = Math.min(waveform.length, (int) (span.endSeconds() * SAMPLE_RATE));
@@ -79,7 +79,7 @@ public final class OnnxSpeakerDiarizer implements SpeakerDiarizer {
                 }
             }
 
-            log(logLineListener, "Agrupando trechos por locutor...");
+            log(logLineListener, "Clustering segments by speaker...");
             int[] labels = SpeakerClusterer.cluster(embeddings, validSpans);
 
             List<SpeakerTurn> turns = new ArrayList<>();
@@ -92,10 +92,10 @@ public final class OnnxSpeakerDiarizer implements SpeakerDiarizer {
                         Duration.ofMillis((long) (span.endSeconds() * 1000)),
                         "S" + labels[i]));
             }
-            log(logLineListener, "Identificação concluída: " + distinctSpeakers.size() + " locutor(es) detectado(s).");
+            log(logLineListener, "Identification complete: " + distinctSpeakers.size() + " speaker(s) detected.");
             return turns;
         } catch (OrtException | IOException e) {
-            throw new DiarizationException("Falha na identificação de participantes: " + e.getMessage(), e);
+            throw new DiarizationException("Failed to identify participants: " + e.getMessage(), e);
         }
     }
 
@@ -109,7 +109,7 @@ public final class OnnxSpeakerDiarizer implements SpeakerDiarizer {
     private static byte[] readResource(String classpathPath) throws IOException {
         try (InputStream in = OnnxSpeakerDiarizer.class.getResourceAsStream(classpathPath)) {
             if (in == null) {
-                throw new IOException("Recurso não encontrado no classpath: " + classpathPath);
+                throw new IOException("Resource not found on classpath: " + classpathPath);
             }
             return in.readAllBytes();
         }

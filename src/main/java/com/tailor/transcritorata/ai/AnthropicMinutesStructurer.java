@@ -28,16 +28,16 @@ public final class AnthropicMinutesStructurer implements MinutesStructurer {
     private static final Pattern JSON_BLOCK = Pattern.compile("\\{.*\\}", Pattern.DOTALL);
 
     private static final String SCHEMA_INSTRUCTIONS = """
-            Você é um assistente que estrutura atas de reunião a partir de transcrições em \
-            português. Responda EXCLUSIVAMENTE com um objeto JSON válido, sem nenhum texto antes \
-            ou depois, seguindo exatamente este schema (chaves em inglês, valores em português):
+            You are an assistant that structures meeting minutes from transcripts. Respond \
+            EXCLUSIVELY with a valid JSON object, with no text before or after it, following \
+            exactly this schema (keys in English, values in English):
 
             {
               "executiveSummary": string,
               "participants": [string],
               "agenda": [string],
               "decisions": [string],
-              "actionItems": [{ "description": string, "owner": string ou null, "dueDate": string ou null }]
+              "actionItems": [{ "description": string, "owner": string or null, "dueDate": string or null }]
             }
             """;
 
@@ -59,40 +59,41 @@ public final class AnthropicMinutesStructurer implements MinutesStructurer {
             return structureFromText(transcriptText);
         }
 
-        LOG.info("Transcrição longa ({} caracteres): resumindo em {} blocos antes de estruturar",
+        LOG.info("Long transcript ({} characters): summarizing into {} chunks before structuring",
                 transcriptText.length(), chunks.size());
         StringBuilder combinedSummaries = new StringBuilder();
         for (int i = 0; i < chunks.size(); i++) {
             String summary = summarizeChunk(chunks.get(i), i + 1, chunks.size());
-            combinedSummaries.append("Trecho ").append(i + 1).append(": ").append(summary).append("\n\n");
+            combinedSummaries.append("Excerpt ").append(i + 1).append(": ").append(summary).append("\n\n");
         }
         return structureFromText(combinedSummaries.toString());
     }
 
     private String summarizeChunk(String chunk, int index, int total) throws MinutesStructuringException {
         String prompt = """
-                Resuma em português, de forma objetiva, o seguinte trecho (%d de %d) da transcrição \
-                de uma reunião. Destaque decisões tomadas, ações combinadas (com responsável e prazo, \
-                se mencionados) e participantes citados. Responda apenas com o resumo em texto corrido.
+                Summarize, objectively and in English, the following excerpt (%d of %d) of a \
+                meeting transcript. Highlight decisions made, action items agreed upon (with owner \
+                and due date, if mentioned), and participants named. Respond only with the summary \
+                as running text.
 
-                Trecho:
+                Excerpt:
                 %s
                 """.formatted(index, total, chunk);
         return callModel(prompt);
     }
 
     private StructuredMinutes structureFromText(String text) throws MinutesStructuringException {
-        String prompt = SCHEMA_INSTRUCTIONS + "\n\nTranscrição da reunião:\n" + text;
+        String prompt = SCHEMA_INSTRUCTIONS + "\n\nMeeting transcript:\n" + text;
         String response = callModel(prompt);
         try {
             return parseStructuredMinutes(response);
         } catch (MinutesStructuringException firstFailure) {
-            LOG.warn("JSON inválido retornado pelo Claude, tentando novamente com correção solicitada");
+            LOG.warn("Invalid JSON returned by Claude, retrying with a correction request");
             String retryPrompt = """
-                    A resposta anterior não era um JSON válido segundo o schema pedido. \
-                    Responda novamente, EXCLUSIVAMENTE com o JSON corrigido, sem nenhum texto adicional.
+                    The previous response was not valid JSON according to the requested schema. \
+                    Respond again, EXCLUSIVELY with the corrected JSON, with no additional text.
 
-                    Resposta anterior:
+                    Previous response:
                     %s
                     """.formatted(response);
             String retryResponse = callModel(retryPrompt);
@@ -115,19 +116,19 @@ public final class AnthropicMinutesStructurer implements MinutesStructurer {
             return text.toString();
         } catch (AnthropicException e) {
             throw new MinutesStructuringException(
-                    "Falha ao comunicar com a API da Anthropic: " + e.getMessage(), e);
+                    "Failed to communicate with the Anthropic API: " + e.getMessage(), e);
         }
     }
 
     private StructuredMinutes parseStructuredMinutes(String response) throws MinutesStructuringException {
         Matcher matcher = JSON_BLOCK.matcher(response == null ? "" : response);
         if (!matcher.find()) {
-            throw new MinutesStructuringException("A resposta do Claude não contém um JSON reconhecível.");
+            throw new MinutesStructuringException("Claude's response does not contain recognizable JSON.");
         }
         try {
             return objectMapper.readValue(matcher.group(), StructuredMinutes.class);
         } catch (JsonProcessingException e) {
-            throw new MinutesStructuringException("JSON retornado pelo Claude é inválido: " + e.getMessage(), e);
+            throw new MinutesStructuringException("JSON returned by Claude is invalid: " + e.getMessage(), e);
         }
     }
 }

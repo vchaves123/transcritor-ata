@@ -7,8 +7,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * Fixed schema returned by Claude when asked to structure a meeting transcript.
- * Keys are in English (part of the prompt contract); values are in Portuguese, since the
- * source meetings are conducted in Portuguese.
+ * Keys and values are both in English, per the prompt contract.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record StructuredMinutes(

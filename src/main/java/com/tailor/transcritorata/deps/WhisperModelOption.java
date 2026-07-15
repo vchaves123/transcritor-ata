@@ -6,9 +6,9 @@ package com.tailor.transcritorata.deps;
  */
 public enum WhisperModelOption {
 
-    SMALL("ggml-small.bin", "Pequeno", "~466 MB — mais rápido, precisão menor. Bom para máquinas modestas."),
-    MEDIUM("ggml-medium.bin", "Médio (recomendado)", "~1,5 GB — bom equilíbrio para uso em CPU."),
-    LARGE_V3("ggml-large-v3.bin", "Grande", "~2,9 GB — melhor precisão. Recomendado se você tiver GPU.");
+    SMALL("ggml-small.bin", "Small", "~466 MB — faster, lower accuracy. Good for modest machines."),
+    MEDIUM("ggml-medium.bin", "Medium (recommended)", "~1.5 GB — good balance for CPU use."),
+    LARGE_V3("ggml-large-v3.bin", "Large", "~2.9 GB — best accuracy. Recommended if you have a GPU.");
 
     private static final String BASE_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/";
 

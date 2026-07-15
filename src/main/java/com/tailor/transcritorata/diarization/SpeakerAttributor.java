@@ -12,8 +12,8 @@ import com.tailor.transcritorata.model.Segment;
 /**
  * Attributes each transcribed {@link Segment} to a speaker by cross-referencing it with the
  * diarization turns: a segment is assigned to whichever speaker turn overlaps it the most in
- * time. Raw diarizer ids ({@code S0}, {@code S1}, ...) are mapped to friendly, ordinal Portuguese
- * labels ("Pessoa 1", "Pessoa 2", ...) in order of first appearance.
+ * time. Raw diarizer ids ({@code S0}, {@code S1}, ...) are mapped to friendly, ordinal English
+ * labels ("Speaker 1", "Speaker 2", ...) in order of first appearance.
  */
 public final class SpeakerAttributor {
 
@@ -27,7 +27,7 @@ public final class SpeakerAttributor {
         for (Segment segment : segments) {
             String rawLabel = bestMatchingSpeaker(segment, turns);
             String friendly = rawLabel == null ? null
-                    : friendlyNames.computeIfAbsent(rawLabel, key -> "Pessoa " + (friendlyNames.size() + 1));
+                    : friendlyNames.computeIfAbsent(rawLabel, key -> "Speaker " + (friendlyNames.size() + 1));
             result.add(new AttributedSegment(segment, friendly));
         }
         return result;

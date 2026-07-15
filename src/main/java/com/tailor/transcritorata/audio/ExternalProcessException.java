@@ -3,7 +3,7 @@ package com.tailor.transcritorata.audio;
 /**
  * Thrown when an external process (ffmpeg, whisper-cli, ...) fails or times out.
  * The message is safe to show to end users in a friendly dialog; {@link #getProcessOutput()}
- * carries the raw stdout/stderr for a "ver detalhes" expander.
+ * carries the raw stdout/stderr for a "view details" expander.
  */
 public class ExternalProcessException extends Exception {
 

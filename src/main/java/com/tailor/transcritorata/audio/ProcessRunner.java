@@ -53,7 +53,7 @@ public final class ProcessRunner {
             Consumer<String> lineConsumer) throws ExternalProcessException {
         StringBuilder output = new StringBuilder();
         String commandLine = formatCommandLine(command);
-        LOG.debug("Executando comando externo: {}", commandLine);
+        LOG.debug("Running external command: {}", commandLine);
         if (lineConsumer != null) {
             lineConsumer.accept(BANNER_SEPARATOR);
             lineConsumer.accept(commandLine);
@@ -88,12 +88,12 @@ public final class ProcessRunner {
             if (!finished) {
                 process.destroyForcibly();
                 throw new ExternalProcessException(
-                        "O processo externo excedeu o tempo limite de " + timeoutSeconds + " segundos.",
+                        "The external process exceeded the timeout of " + timeoutSeconds + " seconds.",
                         output.toString());
             }
             if (process.exitValue() != 0) {
                 throw new ExternalProcessException(
-                        "O processo externo terminou com código de erro " + process.exitValue() + ".",
+                        "The external process terminated with error code " + process.exitValue() + ".",
                         output.toString());
             }
         } catch (IOException e) {
@@ -101,7 +101,7 @@ public final class ProcessRunner {
                 throw new ProcessCancelledException(output.toString());
             }
             throw new ExternalProcessException(
-                    "Não foi possível executar o processo externo: " + e.getMessage(), output.toString());
+                    "Could not run the external process: " + e.getMessage(), output.toString());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new ProcessCancelledException(output.toString());

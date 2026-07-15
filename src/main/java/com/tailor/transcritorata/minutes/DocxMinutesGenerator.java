@@ -61,9 +61,9 @@ public final class DocxMinutesGenerator {
             List<AttributedSegment> segments) throws IOException {
         try (XWPFDocument document = new XWPFDocument()) {
             applyHeaderFooter(document);
-            addTitle(document, "Ata de Reunião");
+            addTitle(document, "Meeting Minutes");
             addMetadataTable(document, metadata);
-            addSectionHeading(document, "Transcrição");
+            addSectionHeading(document, "Transcript");
             addTranscription(document, segments);
             write(document, outputPath);
         }
@@ -83,26 +83,26 @@ public final class DocxMinutesGenerator {
             StructuredMinutes structured, List<AttributedSegment> segments) throws IOException {
         try (XWPFDocument document = new XWPFDocument()) {
             applyHeaderFooter(document);
-            addTitle(document, "Ata de Reunião Estruturada");
+            addTitle(document, "Structured Meeting Minutes");
             addMetadataTable(document, metadata);
 
-            addSectionHeading(document, "Resumo executivo");
+            addSectionHeading(document, "Executive Summary");
             addBodyParagraph(document, structured.executiveSummary());
 
-            addSectionHeading(document, "Participantes");
+            addSectionHeading(document, "Participants");
             addBulletedList(document, structured.participants());
 
-            addSectionHeading(document, "Pauta");
+            addSectionHeading(document, "Agenda");
             addBulletedList(document, structured.agenda());
 
-            addSectionHeading(document, "Decisões");
+            addSectionHeading(document, "Decisions");
             addBulletedList(document, structured.decisions());
 
-            addSectionHeading(document, "Ações");
+            addSectionHeading(document, "Action Items");
             addActionItemsTable(document, structured.actionItems());
 
             document.createParagraph().setPageBreak(true);
-            addSectionHeading(document, "Anexo: transcrição completa");
+            addSectionHeading(document, "Appendix: Full Transcript");
             addTranscription(document, segments);
 
             write(document, outputPath);
@@ -117,7 +117,7 @@ public final class DocxMinutesGenerator {
                 ? header.getParagraphArray(0) : header.createParagraph();
         headerParagraph.setAlignment(ParagraphAlignment.RIGHT);
         XWPFRun headerRun = headerParagraph.createRun();
-        headerRun.setText(companyName.isBlank() ? "Ata de Reunião" : companyName);
+        headerRun.setText(companyName.isBlank() ? "Meeting Minutes" : companyName);
         headerRun.setFontFamily(FONT_FAMILY);
         headerRun.setFontSize(FOOTER_SIZE);
         headerRun.setColor("808080");
@@ -133,7 +133,7 @@ public final class DocxMinutesGenerator {
         XWPFRun run = paragraph.createRun();
         run.setFontFamily(FONT_FAMILY);
         run.setFontSize(FOOTER_SIZE);
-        run.setText("Página ");
+        run.setText("Page ");
 
         CTFldChar begin = run.getCTR().addNewFldChar();
         begin.setFldCharType(STFldCharType.BEGIN);
@@ -203,9 +203,9 @@ public final class DocxMinutesGenerator {
                 : "-";
         String durationText = metadata.duration() != null ? Segment.format(metadata.duration()) : "-";
 
-        setRow(table, 0, "Data da reunião", dateText);
-        setRow(table, 1, "Arquivo de origem", metadata.sourceFileName());
-        setRow(table, 2, "Duração", durationText);
+        setRow(table, 0, "Meeting date", dateText);
+        setRow(table, 1, "Source file", metadata.sourceFileName());
+        setRow(table, 2, "Duration", durationText);
 
         document.createParagraph().setSpacingAfter(200);
     }
@@ -230,13 +230,13 @@ public final class DocxMinutesGenerator {
     private void addActionItemsTable(XWPFDocument document, List<ActionItem> actionItems) {
         XWPFTable table = document.createTable(1, 3);
         table.setWidth("100%");
-        styleHeaderCell(table.getRow(0).getCell(0), "Ação");
-        styleHeaderCell(table.getRow(0).getCell(1), "Responsável");
-        styleHeaderCell(table.getRow(0).getCell(2), "Prazo");
+        styleHeaderCell(table.getRow(0).getCell(0), "Action");
+        styleHeaderCell(table.getRow(0).getCell(1), "Owner");
+        styleHeaderCell(table.getRow(0).getCell(2), "Due Date");
 
         if (actionItems == null || actionItems.isEmpty()) {
             XWPFTableCell cell = table.createRow().getCell(0);
-            styleCell(cell, "Nenhuma ação identificada", false);
+            styleCell(cell, "No action items identified", false);
             return;
         }
 
