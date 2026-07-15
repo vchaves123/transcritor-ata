@@ -19,7 +19,7 @@ import org.eclipse.swt.widgets.Text;
  */
 final class AboutDialog {
 
-    private static final String APP_VERSION = "1.0.3";
+    private static final String APP_VERSION = "1.0.4";
     private static final String REPO_URL = "https://github.com/vchaves123/transcritor-ata";
 
     private AboutDialog() {
@@ -144,5 +144,10 @@ final class AboutDialog {
             Whisper transcription model (downloaded separately by the user, not bundled)
               MIT License (ggerganov/whisper.cpp model conversions)
               https://huggingface.co/ggerganov/whisper.cpp
+
+            Silero VAD (voice activity detection, ggml export, embedded as a resource so
+            whisper.cpp can skip long silences and avoid hallucinated text)
+              MIT License
+              https://huggingface.co/ggml-org/whisper-vad
             """;
 }
