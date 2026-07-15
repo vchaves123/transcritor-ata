@@ -14,7 +14,6 @@ import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTFldChar;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STFldCharType;
 
 import com.tailor.transcritorata.model.AttributedSegment;
@@ -75,20 +74,33 @@ public final class DocxMinutesGenerator {
         addPageNumberField(footerParagraph);
     }
 
+    /**
+     * Inserts a real Word {@code PAGE} field (begin/instrText/separate/end each in their own
+     * run, per the OOXML field convention) so Word recalculates and displays the actual page
+     * number, instead of a hardcoded number that would be wrong on every page but the first.
+     */
     private void addPageNumberField(XWPFParagraph paragraph) {
-        XWPFRun run = paragraph.createRun();
-        run.setFontFamily(FONT_FAMILY);
-        run.setFontSize(FOOTER_SIZE);
-        run.setText("Page ");
+        XWPFRun labelRun = paragraph.createRun();
+        labelRun.setFontFamily(FONT_FAMILY);
+        labelRun.setFontSize(FOOTER_SIZE);
+        labelRun.setText("Page ");
 
-        CTFldChar begin = run.getCTR().addNewFldChar();
-        begin.setFldCharType(STFldCharType.BEGIN);
+        XWPFRun beginRun = paragraph.createRun();
+        beginRun.getCTR().addNewFldChar().setFldCharType(STFldCharType.BEGIN);
 
         XWPFRun instrRun = paragraph.createRun();
         instrRun.getCTR().addNewInstrText().setStringValue("PAGE");
 
-        CTFldChar end = run.getCTR().addNewFldChar();
-        end.setFldCharType(STFldCharType.END);
+        XWPFRun separateRun = paragraph.createRun();
+        separateRun.getCTR().addNewFldChar().setFldCharType(STFldCharType.SEPARATE);
+
+        XWPFRun cachedValueRun = paragraph.createRun();
+        cachedValueRun.setFontFamily(FONT_FAMILY);
+        cachedValueRun.setFontSize(FOOTER_SIZE);
+        cachedValueRun.setText("1");
+
+        XWPFRun endRun = paragraph.createRun();
+        endRun.getCTR().addNewFldChar().setFldCharType(STFldCharType.END);
     }
 
     private void addTitle(XWPFDocument document, String text) {
