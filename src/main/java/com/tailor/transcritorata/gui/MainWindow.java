@@ -4,6 +4,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -41,21 +42,18 @@ import com.tailor.transcritorata.deps.DependencyChecker;
 import com.tailor.transcritorata.deps.DependencyStatus;
 import com.tailor.transcritorata.deps.ExecutableLocator;
 import com.tailor.transcritorata.deps.GpuDetector;
+import com.tailor.transcritorata.deps.WhisperModelOption;
 import com.tailor.transcritorata.minutes.DocxMinutesGenerator;
-import com.tailor.transcritorata.transcription.CudaFallbackTranscriptionEngine;
+import com.tailor.transcritorata.transcription.AdaptiveWhisperEngine;
 import com.tailor.transcritorata.transcription.PipelineResult;
 import com.tailor.transcritorata.transcription.TranscriptionEngine;
 import com.tailor.transcritorata.transcription.TranscriptionPipeline;
-import com.tailor.transcritorata.transcription.WhisperCppEngine;
 
 /** The application's single main window. */
 public final class MainWindow {
 
     private static final Logger LOG = LoggerFactory.getLogger(MainWindow.class);
     private static final long DEFAULT_TIMEOUT_SECONDS = 3600;
-    // Above this percentage of VRAM occupied by the model alone (before even loading audio/activations),
-    // we consider that the GPU probably won't have enough memory left over during transcription.
-    private static final double FAST_MODE_VRAM_THRESHOLD = 0.85;
 
     private final Display display;
     private final AppConfig config;
@@ -83,6 +81,10 @@ public final class MainWindow {
 
     private final List<VideoFileInfo> selectedVideos = new ArrayList<>();
     private volatile ProcessRunner.Handle currentHandle;
+    // Which whisper-cli binary/model/decoding-mode AdaptiveWhisperEngine is currently attempting,
+    // e.g. "Trying ggml-medium.bin on GPU (beam search)" — kept so it stays visible in the
+    // transcription phase's status even once percentage-based progress updates start arriving.
+    private String currentTranscriptionAttempt = "";
 
     public MainWindow(Display display, AppConfig config) {
         this.display = display;
@@ -102,7 +104,6 @@ public final class MainWindow {
         shell.open();
         refreshDependencyState();
         refreshAiAvailability();
-        maybeAutoEnableFastMode();
     }
 
     public boolean isDisposed() {
@@ -125,9 +126,6 @@ public final class MainWindow {
                     refreshDependencyState();
                     refreshAiAvailability();
                 }
-                // The Whisper model may have changed even without clicking "Save" (e.g. via the
-                // "Download another model..." button, which writes to the config immediately).
-                maybeAutoEnableFastMode();
             }
         });
 
@@ -159,9 +157,11 @@ public final class MainWindow {
         fastModeCheckbox = new Button(shell, SWT.CHECK);
         fastModeCheckbox.setText("Prioritize speed and GPU memory usage (less accurate)");
         fastModeCheckbox.setToolTipText(
-                "Uses greedy decoding (beam-size 1) instead of whisper.cpp's default (beam-size 5). "
-                        + "Faster and uses noticeably less GPU memory — helps avoid \"out of memory\" errors "
-                        + "on GPUs with little VRAM, at the cost of a slightly less accurate transcription.");
+                "Uses greedy decoding (beam-size 1) instead of whisper.cpp's default (beam-size 5) from "
+                        + "the very first attempt. Faster and uses noticeably less GPU memory, at the cost of "
+                        + "a slightly less accurate transcription. Note: the app already automatically switches "
+                        + "to fast mode and/or a smaller model on its own if the GPU runs out of memory — check "
+                        + "this only if you'd rather skip straight to fast mode instead of waiting for that.");
         fastModeCheckbox.setSelection(config.getBoolean(AppConfig.KEY_WHISPER_FAST_MODE, false));
         fastModeCheckbox.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
         fastModeCheckbox.addSelectionListener(new SelectionAdapter() {
@@ -552,56 +552,6 @@ public final class MainWindow {
         }
     }
 
-    /**
-     * If the configured Whisper model would occupy most of the GPU's VRAM by itself, the fast
-     * mode (greedy decoding) checkbox is turned on automatically — this is exactly the scenario
-     * that causes CUDA out-of-memory failures partway through a transcription, and beam search
-     * (the whisper.cpp default) uses noticeably more VRAM than greedy decoding.
-     */
-    private void maybeAutoEnableFastMode() {
-        Thread.ofVirtual().start(() -> {
-            String configuredModel = config.get(AppConfig.KEY_WHISPER_MODEL, "");
-            if (configuredModel.isBlank()) {
-                return;
-            }
-            Path modelPath = Path.of(configuredModel);
-            if (!Files.isRegularFile(modelPath)) {
-                return;
-            }
-            long modelBytes;
-            try {
-                modelBytes = Files.size(modelPath);
-            } catch (java.io.IOException e) {
-                return;
-            }
-
-            GpuDetector gpuDetector = new GpuDetector(new ExecutableLocator.Default());
-            if (!gpuDetector.hasNvidiaGpu()) {
-                return;
-            }
-            Optional<Long> vramMb = gpuDetector.vramMb();
-            if (vramMb.isEmpty() || vramMb.get() <= 0) {
-                return;
-            }
-
-            double modelMb = modelBytes / (1024.0 * 1024.0);
-            boolean modelNearlyFillsVram = modelMb >= vramMb.get() * FAST_MODE_VRAM_THRESHOLD;
-
-            display.asyncExec(() -> {
-                if (shell.isDisposed() || fastModeCheckbox.isDisposed()) {
-                    return;
-                }
-                if (modelNearlyFillsVram && !fastModeCheckbox.getSelection()) {
-                    fastModeCheckbox.setSelection(true);
-                    config.setBoolean(AppConfig.KEY_WHISPER_FAST_MODE, true);
-                    config.save();
-                    LOG.info("Configured Whisper model ({} MB) occupies most of the detected VRAM "
-                            + "({} MB); fast mode enabled automatically.", Math.round(modelMb), vramMb.get());
-                }
-            });
-        });
-    }
-
     private void showDependencyDialog() {
         Thread.ofVirtual().start(() -> {
             DependencyChecker checker = new DependencyChecker(config);
@@ -636,6 +586,7 @@ public final class MainWindow {
         transcriptionSection.setStatus("");
         minutesSection.setStatus("");
         diarizationSection.setStatus(diarizationEnabled ? "" : "Disabled");
+        currentTranscriptionAttempt = "";
 
         ProcessRunner.Handle handle = new ProcessRunner.Handle();
         currentHandle = handle;
@@ -742,13 +693,28 @@ public final class MainWindow {
         if (shell.isDisposed()) {
             return;
         }
+        // AdaptiveWhisperEngine announces every (binary, model, decoding mode) it's about to try
+        // with a "Trying ..." message; keep the latest one so the status keeps showing which
+        // whisper/model/mode is currently running even after percentage updates start arriving.
+        if (section == transcriptionSection && message.startsWith("Trying ")) {
+            currentTranscriptionAttempt = message.endsWith("...")
+                    ? message.substring(0, message.length() - 3)
+                    : message;
+        }
         if (percent < 0) {
             section.appendLog(message);
-            section.setStatusIfWaiting("In progress...");
+            if (section == transcriptionSection && !currentTranscriptionAttempt.isEmpty()) {
+                section.setStatus(currentTranscriptionAttempt);
+            } else {
+                section.setStatusIfWaiting("In progress...");
+            }
         } else {
             section.appendLog(message + " (" + percent + "%)");
             if (percent >= 100) {
                 section.setStatus(message.startsWith("Could not") ? "Failed ⚠" : "Completed ✓");
+                currentTranscriptionAttempt = "";
+            } else if (section == transcriptionSection && !currentTranscriptionAttempt.isEmpty()) {
+                section.setStatus(currentTranscriptionAttempt + " — " + percent + "%");
             } else {
                 section.setStatus("In progress (" + percent + "%)");
             }
@@ -813,19 +779,52 @@ public final class MainWindow {
      * fine, and restarting on CPU is far friendlier than surfacing a raw CUDA error.
      */
     private TranscriptionEngine buildWhisperEngine(long timeout) {
-        String configuredBinary = config.get(AppConfig.KEY_WHISPER_BINARY, "whisper-cli");
-        Path modelPath = Path.of(config.get(AppConfig.KEY_WHISPER_MODEL, ""));
-        boolean fastMode = config.getBoolean(AppConfig.KEY_WHISPER_FAST_MODE, false);
-        TranscriptionEngine primary = new WhisperCppEngine(configuredBinary, modelPath, "pt", timeout, fastMode);
+        Path cudaBinaryPath = Path.of("tools", "whisper-cuda", "Release", "whisper-cli.exe");
+        Path cpuBinaryPath = Path.of("tools", "whisper-cpu", "Release", "whisper-cli.exe");
+        String cudaBinary = Files.isRegularFile(cudaBinaryPath) ? cudaBinaryPath.toString() : null;
+        String cpuBinary = Files.isRegularFile(cpuBinaryPath) ? cpuBinaryPath.toString()
+                : config.get(AppConfig.KEY_WHISPER_BINARY, "whisper-cli");
 
-        Path cpuBinary = Path.of("tools", "whisper-cpu", "Release", "whisper-cli.exe");
-        boolean alreadyOnCpuBuild = Path.of(configuredBinary).equals(cpuBinary);
-        if (alreadyOnCpuBuild || !Files.isRegularFile(cpuBinary)) {
-            return primary;
+        Path configuredModelPath = Path.of(config.get(AppConfig.KEY_WHISPER_MODEL, ""));
+        List<AdaptiveWhisperEngine.ModelCandidate> candidates = discoverModelCandidates(configuredModelPath);
+        Path cpuFallbackModel = candidates.isEmpty() ? configuredModelPath : candidates.get(0).path();
+
+        boolean preferFastModeFirst = config.getBoolean(AppConfig.KEY_WHISPER_FAST_MODE, false);
+        GpuDetector gpuDetector = new GpuDetector(new ExecutableLocator.Default());
+
+        return new AdaptiveWhisperEngine(cudaBinary, cpuBinary, candidates, cpuFallbackModel, "pt", timeout,
+                preferFastModeFirst, gpuDetector);
+    }
+
+    /**
+     * Locally available Whisper models, sorted largest-first: every known size (Small/Medium/
+     * Large) found next to the configured model, plus the configured model itself (in case it's a
+     * custom file that doesn't match one of those names) — deduplicated by path.
+     */
+    private static List<AdaptiveWhisperEngine.ModelCandidate> discoverModelCandidates(Path configuredModelPath) {
+        Path modelsDir = configuredModelPath.getParent();
+        if (modelsDir == null) {
+            modelsDir = Path.of("tools", "models");
         }
 
-        TranscriptionEngine cpuFallback = new WhisperCppEngine(cpuBinary.toString(), modelPath, "pt", timeout,
-                fastMode);
-        return new CudaFallbackTranscriptionEngine(primary, cpuFallback);
+        List<AdaptiveWhisperEngine.ModelCandidate> candidates = new ArrayList<>();
+        for (WhisperModelOption option : WhisperModelOption.values()) {
+            addCandidateIfFile(candidates, modelsDir.resolve(option.fileName()));
+        }
+        addCandidateIfFile(candidates, configuredModelPath);
+
+        candidates.sort(Comparator.comparingLong(AdaptiveWhisperEngine.ModelCandidate::sizeBytes).reversed());
+        return candidates;
+    }
+
+    private static void addCandidateIfFile(List<AdaptiveWhisperEngine.ModelCandidate> candidates, Path path) {
+        if (path == null || !Files.isRegularFile(path) || candidates.stream().anyMatch(c -> c.path().equals(path))) {
+            return;
+        }
+        try {
+            candidates.add(new AdaptiveWhisperEngine.ModelCandidate(path, Files.size(path)));
+        } catch (java.io.IOException e) {
+            // Skip unreadable file; it just won't be offered as a candidate.
+        }
     }
 }
