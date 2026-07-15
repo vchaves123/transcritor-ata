@@ -63,7 +63,7 @@ public final class MainWindow {
     private Label totalsLabel;
     private Label outputDirLabel;
     private Button outputDirButton;
-    private Button preferencesButton;
+    private MenuItem preferencesMenuItem;
     private Button diarizationCheckbox;
     private Button fastModeCheckbox;
     private Button transcribeButton;
@@ -111,17 +111,6 @@ public final class MainWindow {
 
         buildMenu();
         buildFileListSection();
-
-        preferencesButton = new Button(shell, SWT.PUSH);
-        preferencesButton.setText("Preferences...");
-        preferencesButton.addSelectionListener(new SelectionAdapter() {
-            @Override
-            public void widgetSelected(SelectionEvent e) {
-                if (PreferencesDialog.open(shell, config)) {
-                    refreshDependencyState();
-                }
-            }
-        });
 
         diarizationCheckbox = new Button(shell, SWT.CHECK);
         diarizationCheckbox.setText("Identify participants in the transcription (experimental)");
@@ -322,6 +311,22 @@ public final class MainWindow {
     private void buildMenu() {
         Menu menuBar = new Menu(shell, SWT.BAR);
         shell.setMenuBar(menuBar);
+
+        MenuItem settingsMenuHeader = new MenuItem(menuBar, SWT.CASCADE);
+        settingsMenuHeader.setText("Settings");
+        Menu settingsMenu = new Menu(shell, SWT.DROP_DOWN);
+        settingsMenuHeader.setMenu(settingsMenu);
+
+        preferencesMenuItem = new MenuItem(settingsMenu, SWT.PUSH);
+        preferencesMenuItem.setText("Preferences...");
+        preferencesMenuItem.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                if (PreferencesDialog.open(shell, config)) {
+                    refreshDependencyState();
+                }
+            }
+        });
 
         MenuItem helpMenuHeader = new MenuItem(menuBar, SWT.CASCADE);
         helpMenuHeader.setText("Help");
@@ -579,7 +584,7 @@ public final class MainWindow {
         fileListWidget.setEnabled(!busy);
         addButton.setEnabled(!busy);
         outputDirButton.setEnabled(!busy);
-        preferencesButton.setEnabled(!busy);
+        preferencesMenuItem.setEnabled(!busy);
         diarizationCheckbox.setEnabled(!busy);
         fastModeCheckbox.setEnabled(!busy);
         cancelButton.setEnabled(busy);
