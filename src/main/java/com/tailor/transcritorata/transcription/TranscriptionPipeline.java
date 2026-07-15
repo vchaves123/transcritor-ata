@@ -15,9 +15,6 @@ import java.util.concurrent.Future;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.tailor.transcritorata.ai.MinutesStructurer;
-import com.tailor.transcritorata.ai.MinutesStructuringException;
-import com.tailor.transcritorata.ai.StructuredMinutes;
 import com.tailor.transcritorata.audio.AudioExtractor;
 import com.tailor.transcritorata.audio.ExternalProcessException;
 import com.tailor.transcritorata.audio.ProcessRunner;
@@ -31,11 +28,7 @@ import com.tailor.transcritorata.model.Segment;
 
 /**
  * Orchestrates the full pipeline: audio extraction from one or more source files (concatenated
- * in the given order), transcription, plain minutes generation, and the optional AI-structured
- * minutes step.
- *
- * <p>The plain minutes are always written to disk before the AI step runs, so a network or API
- * failure during structuring never loses the transcription.
+ * in the given order), transcription, and minutes generation.
  */
 public final class TranscriptionPipeline {
 
@@ -44,20 +37,15 @@ public final class TranscriptionPipeline {
     private final AudioExtractor audioExtractor;
     private final TranscriptionEngine engine;
     private final DocxMinutesGenerator docxGenerator;
-    private final MinutesStructurer minutesStructurer;
     private final SpeakerDiarizer speakerDiarizer;
-    private final boolean aiEnabled;
     private final boolean diarizationEnabled;
 
     public TranscriptionPipeline(AudioExtractor audioExtractor, TranscriptionEngine engine,
-            DocxMinutesGenerator docxGenerator, MinutesStructurer minutesStructurer,
-            SpeakerDiarizer speakerDiarizer, boolean aiEnabled, boolean diarizationEnabled) {
+            DocxMinutesGenerator docxGenerator, SpeakerDiarizer speakerDiarizer, boolean diarizationEnabled) {
         this.audioExtractor = audioExtractor;
         this.engine = engine;
         this.docxGenerator = docxGenerator;
-        this.minutesStructurer = minutesStructurer;
         this.speakerDiarizer = speakerDiarizer;
-        this.aiEnabled = aiEnabled;
         this.diarizationEnabled = diarizationEnabled;
     }
 
@@ -69,8 +57,7 @@ public final class TranscriptionPipeline {
      * @param diarizationListener   receives progress/log lines for the (optional) diarization step, kept
      *                              separate since diarization runs concurrently with transcription and
      *                              their raw process output would otherwise interleave in the same log
-     * @param minutesListener       receives progress/log lines for minutes generation (docx + optional AI
-     *                              structuring)
+     * @param minutesListener       receives progress/log lines for minutes generation (docx)
      */
     public PipelineResult run(List<Path> videoFiles, Path outputDir,
             ProgressListener audioListener, ProgressListener transcriptionListener,
@@ -120,32 +107,14 @@ public final class TranscriptionPipeline {
 
             String baseName = stripExtension(videoFiles.get(0).getFileName().toString());
             MeetingMetadata metadata = new MeetingMetadata(LocalDate.now(), sourceFileNames(videoFiles),
-                    totalDuration, docxGenerator.companyNameForDisplay());
+                    totalDuration);
 
             minutesListener.onProgress("Generating minutes...", 50);
             Path simpleMinutes = outputDir.resolve(baseName + "-minutes.docx");
             docxGenerator.generateSimpleMinutesAttributed(simpleMinutes, metadata, attributed);
 
-            Path structuredMinutes = null;
-            String aiWarning = null;
-            if (aiEnabled && minutesStructurer != null) {
-                minutesListener.onProgress("Generating AI-structured minutes...", 70);
-                try {
-                    String transcriptText = String.join("\n", segments.stream().map(Segment::text).toList());
-                    StructuredMinutes structured = minutesStructurer.structure(transcriptText);
-                    structuredMinutes = outputDir.resolve(baseName + "-minutes-structured.docx");
-                    docxGenerator.generateStructuredMinutesAttributed(structuredMinutes, metadata, structured,
-                            attributed);
-                } catch (MinutesStructuringException e) {
-                    LOG.warn("Failed to generate AI-structured minutes: {}", e.getMessage(), e);
-                    aiWarning = "Could not generate the AI-structured minutes (" + e.getMessage()
-                            + "). The plain minutes were generated normally.";
-                    minutesListener.onProgress(aiWarning, -1);
-                }
-            }
-
             minutesListener.onProgress("Complete", 100);
-            return new PipelineResult(simpleMinutes, structuredMinutes, aiWarning, segments);
+            return new PipelineResult(simpleMinutes);
         } finally {
             deleteRecursively(tempDir);
         }

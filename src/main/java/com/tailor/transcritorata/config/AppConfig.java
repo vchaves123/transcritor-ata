@@ -30,11 +30,6 @@ public final class AppConfig {
     public static final String KEY_OUTPUT_DIR = "outputDir";
     public static final String KEY_COMPANY_NAME = "docx.companyName";
     public static final String KEY_PROCESS_TIMEOUT_SECONDS = "process.timeoutSeconds";
-    public static final String KEY_AI_ENABLED = "ai.enabled";
-    public static final String KEY_AI_MODEL = "ai.model";
-    public static final String KEY_AI_API_KEY = "ai.apiKey";
-    public static final String KEY_AI_PRIVACY_CONSENT = "ai.privacyConsentGiven";
-    public static final String KEY_AI_CHUNK_CHAR_LIMIT = "ai.chunkCharLimit";
     public static final String KEY_DIARIZATION_ENABLED = "diarization.enabled";
 
     private final Properties properties = new Properties();
@@ -58,10 +53,6 @@ public final class AppConfig {
         return base.resolve("transcritor-ata");
     }
 
-    public static Path logsDir() {
-        return defaultConfigDir().resolve("logs");
-    }
-
     private void load() {
         if (!Files.exists(configFile)) {
             return;
@@ -77,10 +68,6 @@ public final class AppConfig {
         properties.putIfAbsent(KEY_FFMPEG_BINARY, "ffmpeg");
         properties.putIfAbsent(KEY_WHISPER_FAST_MODE, "false");
         properties.putIfAbsent(KEY_PROCESS_TIMEOUT_SECONDS, "3600");
-        properties.putIfAbsent(KEY_AI_ENABLED, "false");
-        properties.putIfAbsent(KEY_AI_MODEL, "claude-sonnet-4-6");
-        properties.putIfAbsent(KEY_AI_PRIVACY_CONSENT, "false");
-        properties.putIfAbsent(KEY_AI_CHUNK_CHAR_LIMIT, "12000");
         properties.putIfAbsent(KEY_COMPANY_NAME, "");
         properties.putIfAbsent(KEY_DIARIZATION_ENABLED, "false");
     }
@@ -131,18 +118,5 @@ public final class AppConfig {
 
     public void setInt(String key, int value) {
         set(key, Integer.toString(value));
-    }
-
-    /**
-     * Resolves the Anthropic API key, preferring the {@code ANTHROPIC_API_KEY} environment
-     * variable over the value stored in preferences.
-     */
-    public String resolveAnthropicApiKey() {
-        String envKey = System.getenv("ANTHROPIC_API_KEY");
-        if (envKey != null && !envKey.isBlank()) {
-            return envKey;
-        }
-        String stored = properties.getProperty(KEY_AI_API_KEY);
-        return stored == null || stored.isBlank() ? null : stored;
     }
 }

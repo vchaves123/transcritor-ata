@@ -26,10 +26,6 @@ import org.eclipse.swt.widgets.Shell;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.anthropic.client.AnthropicClient;
-import com.anthropic.client.okhttp.AnthropicOkHttpClient;
-import com.tailor.transcritorata.ai.AnthropicMinutesStructurer;
-import com.tailor.transcritorata.ai.MinutesStructurer;
 import com.tailor.transcritorata.audio.AudioExtractor;
 import com.tailor.transcritorata.audio.ExternalProcessException;
 import com.tailor.transcritorata.audio.ProcessCancelledException;
@@ -68,7 +64,6 @@ public final class MainWindow {
     private Label outputDirLabel;
     private Button outputDirButton;
     private Button preferencesButton;
-    private Button aiCheckbox;
     private Button diarizationCheckbox;
     private Button fastModeCheckbox;
     private Button transcribeButton;
@@ -103,7 +98,7 @@ public final class MainWindow {
     public void open() {
         shell.open();
         refreshDependencyState();
-        refreshAiAvailability();
+        refreshDiarizationAvailability();
     }
 
     public boolean isDisposed() {
@@ -124,20 +119,7 @@ public final class MainWindow {
             public void widgetSelected(SelectionEvent e) {
                 if (PreferencesDialog.open(shell, config)) {
                     refreshDependencyState();
-                    refreshAiAvailability();
                 }
-            }
-        });
-
-        aiCheckbox = new Button(shell, SWT.CHECK);
-        aiCheckbox.setText("Generate AI-structured minutes (Claude)");
-        aiCheckbox.setSelection(config.getBoolean(AppConfig.KEY_AI_ENABLED, false));
-        aiCheckbox.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
-        aiCheckbox.addSelectionListener(new SelectionAdapter() {
-            @Override
-            public void widgetSelected(SelectionEvent e) {
-                config.setBoolean(AppConfig.KEY_AI_ENABLED, aiCheckbox.getSelection());
-                config.save();
             }
         });
 
@@ -502,8 +484,7 @@ public final class MainWindow {
         Thread.ofVirtual().start(() -> {
             DependencyChecker checker = new DependencyChecker(config);
             List<DependencyStatus> statuses = checker.checkAll();
-            // Optional dependencies (e.g. diarization) do not block transcription.
-            boolean allOk = statuses.stream().filter(s -> !s.optional()).allMatch(DependencyStatus::ok);
+            boolean allOk = statuses.stream().allMatch(DependencyStatus::ok);
             display.asyncExec(() -> {
                 if (!shell.isDisposed()) {
                     transcribeButton.setEnabled(allOk && !selectedVideos.isEmpty());
@@ -512,29 +493,6 @@ public final class MainWindow {
                 }
             });
         });
-    }
-
-    private void refreshAiAvailability() {
-        Thread.ofVirtual().start(() -> {
-            boolean apiKeyPresent = config.resolveAnthropicApiKey() != null;
-            boolean consented = config.getBoolean(AppConfig.KEY_AI_PRIVACY_CONSENT, false);
-            display.asyncExec(() -> {
-                if (shell.isDisposed()) {
-                    return;
-                }
-                boolean available = apiKeyPresent && consented;
-                aiCheckbox.setEnabled(available);
-                if (!available) {
-                    aiCheckbox.setSelection(false);
-                    aiCheckbox.setToolTipText(!apiKeyPresent
-                            ? "Configure the Anthropic API key in Preferences to enable this feature."
-                            : "You must confirm the privacy consent in Preferences.");
-                } else {
-                    aiCheckbox.setToolTipText(null);
-                }
-            });
-        });
-        refreshDiarizationAvailability();
     }
 
     private void refreshDiarizationAvailability() {
@@ -570,10 +528,9 @@ public final class MainWindow {
         }
 
         // Reads the widget state here, on the UI thread and before locking down the controls
-        // (which disables these same checkboxes) — the background thread must not touch SWT
+        // (which disables this same checkbox) — the background thread must not touch SWT
         // widgets (it would throw SWTException: Invalid thread access), and reading after
         // disabling would always yield "false".
-        boolean aiEnabled = aiCheckbox.getEnabled() && aiCheckbox.getSelection();
         boolean diarizationEnabled = diarizationCheckbox.getEnabled() && diarizationCheckbox.getSelection();
         List<Path> videos = selectedVideos.stream().map(VideoFileInfo::path).toList();
 
@@ -591,7 +548,7 @@ public final class MainWindow {
         ProcessRunner.Handle handle = new ProcessRunner.Handle();
         currentHandle = handle;
 
-        Thread.ofVirtual().start(() -> runPipeline(handle, videos, aiEnabled, diarizationEnabled));
+        Thread.ofVirtual().start(() -> runPipeline(handle, videos, diarizationEnabled));
     }
 
     private void cancelTranscription() {
@@ -615,9 +572,8 @@ public final class MainWindow {
      * While a transcription runs, every control except the collapsible sections' expand/collapse
      * toggle is locked down (only "Cancel" remains usable) so the user can't change files or
      * settings mid-run. When it ends (success, cancellation, or failure), controls go back to
-     * their normal state — re-derived via {@link #refreshDependencyState()}/{@link
-     * #refreshAiAvailability()} rather than blindly re-enabled, since their availability depends
-     * on external conditions (dependencies present, AI opted in, etc.).
+     * their normal state — re-derived via {@link #refreshDependencyState()} rather than blindly
+     * re-enabled, since their availability depends on external conditions (dependencies present).
      */
     private void setControlsEnabledWhileBusy(boolean busy) {
         fileListWidget.setEnabled(!busy);
@@ -629,7 +585,6 @@ public final class MainWindow {
         cancelButton.setEnabled(busy);
         if (busy) {
             fileListWidget.deselectAll();
-            aiCheckbox.setEnabled(false);
             transcribeButton.setEnabled(false);
             removeFileButton.setEnabled(false);
             moveUpButton.setEnabled(false);
@@ -637,14 +592,12 @@ public final class MainWindow {
         } else {
             refreshFileListButtons();
             refreshDependencyState();
-            refreshAiAvailability();
         }
     }
 
-    private void runPipeline(ProcessRunner.Handle handle, List<Path> videos, boolean aiEnabled,
-            boolean diarizationEnabled) {
+    private void runPipeline(ProcessRunner.Handle handle, List<Path> videos, boolean diarizationEnabled) {
         try {
-            TranscriptionPipeline pipeline = buildPipeline(aiEnabled, diarizationEnabled);
+            TranscriptionPipeline pipeline = buildPipeline(diarizationEnabled);
             Path outputDir = resolveOutputDir(videos);
             // percent == -1 is the sentinel used by the engines/ffmpeg for "just a log line"
             // (raw process output, transcribed sentences as they are recognized, etc.), which
@@ -664,8 +617,7 @@ public final class MainWindow {
                     return;
                 }
                 setControlsEnabledWhileBusy(false);
-                SuccessDialog.show(shell, result.simpleMinutesPath(), result.structuredMinutesPath(),
-                        result.aiWarning());
+                SuccessDialog.show(shell, result.simpleMinutesPath());
             });
         } catch (ProcessCancelledException e) {
             LOG.info("Transcription cancelled by the user");
@@ -729,7 +681,7 @@ public final class MainWindow {
         ErrorDialog.show(shell, friendlyMessage, details);
     }
 
-    private TranscriptionPipeline buildPipeline(boolean aiEnabled, boolean diarizationEnabled) throws Exception {
+    private TranscriptionPipeline buildPipeline(boolean diarizationEnabled) throws Exception {
         long timeout = config.getInt(AppConfig.KEY_PROCESS_TIMEOUT_SECONDS, (int) DEFAULT_TIMEOUT_SECONDS);
         AudioExtractor audioExtractor = new AudioExtractor(resolveFfmpegExecutable(), timeout);
 
@@ -737,20 +689,9 @@ public final class MainWindow {
 
         DocxMinutesGenerator generator = new DocxMinutesGenerator(config.get(AppConfig.KEY_COMPANY_NAME, ""));
 
-        MinutesStructurer structurer = null;
-        if (aiEnabled) {
-            AnthropicClient client = AnthropicOkHttpClient.builder()
-                    .apiKey(config.resolveAnthropicApiKey())
-                    .build();
-            structurer = new AnthropicMinutesStructurer(client,
-                    config.get(AppConfig.KEY_AI_MODEL, "claude-sonnet-4-6"),
-                    config.getInt(AppConfig.KEY_AI_CHUNK_CHAR_LIMIT, 12000));
-        }
-
         SpeakerDiarizer diarizer = diarizationEnabled ? new OnnxSpeakerDiarizer() : null;
 
-        return new TranscriptionPipeline(audioExtractor, engine, generator, structurer, diarizer,
-                aiEnabled, diarizationEnabled);
+        return new TranscriptionPipeline(audioExtractor, engine, generator, diarizer, diarizationEnabled);
     }
 
     private String resolveFfmpegExecutable() {

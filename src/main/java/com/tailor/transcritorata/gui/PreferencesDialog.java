@@ -10,19 +10,18 @@ import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.FileDialog;
 import org.eclipse.swt.widgets.Label;
-import org.eclipse.swt.widgets.MessageBox;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Text;
 
 import com.tailor.transcritorata.config.AppConfig;
 
-/** Preferences dialog: engine paths, company name, and the opt-in AI structuring settings. */
+/** Preferences dialog: engine paths and company name. */
 final class PreferencesDialog {
 
     private PreferencesDialog() {
     }
 
-    /** @return true if the user saved changes (so the caller can refresh AI availability, etc.) */
+    /** @return true if the user saved changes */
     static boolean open(Shell parent, AppConfig config) {
         Shell dialog = new Shell(parent, SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
         AppIcon.apply(dialog);
@@ -55,26 +54,6 @@ final class PreferencesDialog {
             }
         });
 
-        Label separator = new Label(dialog, SWT.SEPARATOR | SWT.HORIZONTAL);
-        GridData separatorData = new GridData(SWT.FILL, SWT.CENTER, true, false);
-        separatorData.horizontalSpan = 3;
-        separator.setLayoutData(separatorData);
-
-        Text aiModelText = row(dialog, "Claude model", config.get(AppConfig.KEY_AI_MODEL, "claude-sonnet-4-6"), null);
-
-        Text aiApiKeyText = row(dialog, "Anthropic API key (optional)",
-                config.get(AppConfig.KEY_AI_API_KEY, ""), null);
-        aiApiKeyText.setEchoChar('*');
-
-        Label apiKeyHint = new Label(dialog, SWT.WRAP);
-        apiKeyHint.setText("The key will be saved in the user's local configuration file. Prefer setting the "
-                + "ANTHROPIC_API_KEY environment variable when possible. API usage is billed by Anthropic "
-                + "based on consumption — see https://console.anthropic.com.");
-        GridData hintData = new GridData(SWT.FILL, SWT.CENTER, true, false);
-        hintData.horizontalSpan = 3;
-        hintData.widthHint = 480;
-        apiKeyHint.setLayoutData(hintData);
-
         boolean[] saved = { false };
 
         Button save = new Button(dialog, SWT.PUSH);
@@ -89,17 +68,6 @@ final class PreferencesDialog {
                 config.set(AppConfig.KEY_FFMPEG_BINARY, ffmpegBinaryText.getText().trim());
                 config.set(AppConfig.KEY_WHISPER_BINARY, whisperBinaryText.getText().trim());
                 config.set(AppConfig.KEY_WHISPER_MODEL, whisperModelText.getText().trim());
-                config.set(AppConfig.KEY_AI_MODEL, aiModelText.getText().trim());
-
-                String newApiKey = aiApiKeyText.getText().trim();
-                boolean hadKeyBefore = config.resolveAnthropicApiKey() != null;
-                config.set(AppConfig.KEY_AI_API_KEY, newApiKey);
-                boolean hasKeyNow = config.resolveAnthropicApiKey() != null;
-
-                if (hasKeyNow && !hadKeyBefore && !config.getBoolean(AppConfig.KEY_AI_PRIVACY_CONSENT, false)) {
-                    boolean consented = confirmPrivacy(dialog);
-                    config.setBoolean(AppConfig.KEY_AI_PRIVACY_CONSENT, consented);
-                }
 
                 config.save();
                 saved[0] = true;
@@ -118,19 +86,6 @@ final class PreferencesDialog {
             }
         }
         return saved[0];
-    }
-
-    private static boolean confirmPrivacy(Shell parent) {
-        MessageBox box = new MessageBox(parent, SWT.ICON_INFORMATION | SWT.YES | SWT.NO);
-        box.setText("Privacy — AI feature");
-        box.setMessage("""
-                Enabling AI-structured minutes generation will send the meeting transcript's text \
-                to the Anthropic API over the internet to be processed by the Claude model.
-
-                Without this feature, transcritor-ata works 100%% offline.
-
-                Do you want to enable sending the transcript to the Anthropic API?""");
-        return box.open() == SWT.YES;
     }
 
     private static Text row(Shell dialog, String label, String initialValue, Supplier<String> browseAction) {

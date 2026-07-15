@@ -12,27 +12,27 @@ import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import com.tailor.transcritorata.ai.ActionItem;
-import com.tailor.transcritorata.ai.StructuredMinutes;
 import com.tailor.transcritorata.model.AttributedSegment;
 import com.tailor.transcritorata.model.Segment;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DocxMinutesGeneratorTest {
 
     private static final MeetingMetadata METADATA = new MeetingMetadata(
-            LocalDate.of(2026, 7, 10), "board-meeting.wmv", Duration.ofMinutes(45), "Tailor");
+            LocalDate.of(2026, 7, 10), "board-meeting.wmv", Duration.ofMinutes(45));
 
     private static final List<Segment> SEGMENTS = List.of(
             new Segment(Duration.ZERO, Duration.ofSeconds(5), "Good morning, everyone."),
             new Segment(Duration.ofSeconds(5), Duration.ofSeconds(12), "Let's review the schedule."));
 
+    private static final List<AttributedSegment> UNATTRIBUTED_SEGMENTS = SEGMENTS.stream()
+            .map(s -> new AttributedSegment(s, null)).toList();
+
     @Test
     void generatesSimpleMinutesWithTitleMetadataAndSegments(@TempDir Path tempDir) throws IOException {
         Path output = tempDir.resolve("minutes.docx");
-        new DocxMinutesGenerator("Tailor").generateSimpleMinutes(output, METADATA, SEGMENTS);
+        new DocxMinutesGenerator("Tailor").generateSimpleMinutesAttributed(output, METADATA, UNATTRIBUTED_SEGMENTS);
 
         try (XWPFDocument document = new XWPFDocument(java.nio.file.Files.newInputStream(output))) {
             String fullText = extractText(document);
@@ -41,41 +41,6 @@ class DocxMinutesGeneratorTest {
             assertTrue(fullText.contains("00:45:00") || fullText.contains("00:45"));
             assertTrue(fullText.contains("Good morning, everyone."));
             assertTrue(fullText.contains("[00:00:05]"));
-        }
-    }
-
-    @Test
-    void generatesStructuredMinutesWithActionItemsTable(@TempDir Path tempDir) throws IOException {
-        StructuredMinutes structured = new StructuredMinutes(
-                "Discussion about the project schedule.",
-                List.of("Maria", "John"),
-                List.of("Scope review", "Risks"),
-                List.of("Postpone delivery to August"),
-                List.of(new ActionItem("Update schedule", "Maria", "2026-07-20")));
-
-        Path output = tempDir.resolve("minutes-structured.docx");
-        new DocxMinutesGenerator("Tailor").generateStructuredMinutes(output, METADATA, structured, SEGMENTS);
-
-        try (XWPFDocument document = new XWPFDocument(java.nio.file.Files.newInputStream(output))) {
-            String fullText = extractText(document);
-            assertTrue(fullText.contains("Structured Meeting Minutes"));
-            assertTrue(fullText.contains("Discussion about the project schedule."));
-            assertTrue(fullText.contains("Maria"));
-            assertTrue(fullText.contains("Scope review"));
-            assertTrue(fullText.contains("Postpone delivery to August"));
-
-            List<XWPFTable> tables = document.getTables();
-            boolean foundActionTable = tables.stream().anyMatch(t ->
-                    t.getRow(0).getCell(0).getText().equals("Action")
-                            && t.getRow(0).getCell(1).getText().equals("Owner")
-                            && t.getRow(0).getCell(2).getText().equals("Due Date"));
-            assertTrue(foundActionTable, "Should contain the action items table with the expected header");
-
-            XWPFTable actionTable = tables.stream().filter(t ->
-                    t.getRow(0).getCell(0).getText().equals("Action")).findFirst().orElseThrow();
-            assertEquals("Update schedule", actionTable.getRow(1).getCell(0).getText());
-            assertEquals("Maria", actionTable.getRow(1).getCell(1).getText());
-            assertEquals("2026-07-20", actionTable.getRow(1).getCell(2).getText());
         }
     }
 

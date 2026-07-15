@@ -18,29 +18,17 @@ final class SuccessDialog {
     private SuccessDialog() {
     }
 
-    static void show(Shell parent, Path simpleMinutes, Path structuredMinutes, String aiWarning) {
+    static void show(Shell parent, Path simpleMinutes) {
         Shell dialog = new Shell(parent, SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
         AppIcon.apply(dialog);
         dialog.setText("Transcription complete");
         dialog.setLayout(new GridLayout(1, false));
 
         Label message = new Label(dialog, SWT.WRAP);
-        String text = "The minutes were generated successfully:\n" + simpleMinutes.getFileName();
-        if (structuredMinutes != null) {
-            text += "\nas well as the structured minutes:\n" + structuredMinutes.getFileName();
-        }
-        message.setText(text);
+        message.setText("The minutes were generated successfully:\n" + simpleMinutes.getFileName());
         GridData messageData = new GridData(SWT.FILL, SWT.CENTER, true, false);
         messageData.widthHint = 400;
         message.setLayoutData(messageData);
-
-        if (aiWarning != null) {
-            Label warning = new Label(dialog, SWT.WRAP);
-            warning.setText("Warning: " + aiWarning);
-            GridData warningData = new GridData(SWT.FILL, SWT.CENTER, true, false);
-            warningData.widthHint = 400;
-            warning.setLayoutData(warningData);
-        }
 
         var buttonsComposite = new org.eclipse.swt.widgets.Composite(dialog, SWT.NONE);
         buttonsComposite.setLayout(new GridLayout(3, false));

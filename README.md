@@ -16,9 +16,7 @@ without needing to edit video, use the command line, or know AI tools.
 
 1. Choose one or more meeting video files (in the order they should be concatenated).
 2. Click "Transcribe". The program extracts the audio, transcribes it, and generates the minutes.
-4. When finished, open the `.docx` minutes directly from the application.
-5. Optionally, enable generation of **AI-structured minutes** (executive summary, participants,
-   agenda, decisions, and an action table), using the Anthropic (Claude) API.
+3. When finished, open the `.docx` minutes directly from the application.
 
 ## Prerequisites (Windows 11)
 
@@ -85,14 +83,7 @@ If you'd rather download it yourself: https://huggingface.co/ggerganov/whisper.c
 
 Save the file and select it in the application's preferences.
 
-### 4. (Optional, paid) Anthropic API key
-
-Only needed if you want to use the **AI-structured minutes** feature. Without it, the program
-works 100% offline. Get a key at https://console.anthropic.com — usage is billed by Anthropic
-based on consumption. Configure it via the `ANTHROPIC_API_KEY` environment variable or in the
-corresponding preferences field.
-
-### 5. (Optional, experimental) Speaker identification
+### 4. (Optional, experimental) Speaker identification
 
 No extra installation or download is required. Simply check the "Identify speakers in the
 transcription (experimental)" checkbox before transcribing, so the minutes indicate who spoke
@@ -169,7 +160,6 @@ by default).
 - `audio` — audio extraction via ffmpeg and external process execution.
 - `transcription` — transcription engine (Whisper.cpp) and the orchestrating pipeline.
 - `minutes` — generation of `.docx` minutes (Apache POI).
-- `ai` — optional integration with the Anthropic API for AI-structured minutes.
 - `diarization` — optional speaker identification (neural pipeline via ONNX Runtime).
 - `deps` — dependency checker.
 - `config` — user preferences.
@@ -182,11 +172,10 @@ by default).
 ## Known limitations
 
 - Speaker identification (diarization) is optional and experimental — accuracy can vary
-  considerably depending on the recording. See item 5 of the prerequisites.
+  considerably depending on the recording. See item 4 of the prerequisites.
 - There is no installer (`.msi`/`.exe`); distribution is via an executable jar.
 - The minutes' styles are defined in code (`DocxMinutesGenerator`), without using a corporate
   `.dotx` template — the class has already been structured for this future evolution.
-- AI-structured minutes generation requires an internet connection and a paid Anthropic API key.
 
 ## Tests
 
@@ -194,5 +183,5 @@ by default).
 mvn test
 ```
 
-Tests don't require ffmpeg, whisper.cpp, models, or a real API key — external processes and the
-AI integration are isolated behind interfaces and tested with mocks/fixtures.
+Tests don't require ffmpeg, whisper.cpp, or models — external processes are isolated behind
+interfaces and tested with mocks/fixtures.
