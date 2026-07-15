@@ -70,10 +70,6 @@ final class CollapsibleSection {
         titleLabel.addMouseListener(toggleOnClick);
     }
 
-    Composite control() {
-        return container;
-    }
-
     void setStatus(String status) {
         if (!statusLabel.isDisposed()) {
             statusLabel.setText(status);

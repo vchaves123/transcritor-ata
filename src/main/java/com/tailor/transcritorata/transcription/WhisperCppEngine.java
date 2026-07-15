@@ -43,10 +43,6 @@ public final class WhisperCppEngine implements TranscriptionEngine {
     private final boolean fastMode;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public WhisperCppEngine(String whisperCliExecutable, Path modelPath, String language, long timeoutSeconds) {
-        this(whisperCliExecutable, modelPath, language, timeoutSeconds, false);
-    }
-
     /**
      * @param fastMode when {@code true}, forces greedy decoding ({@code -bs 1 -bo 1}) instead of
      *                 whisper.cpp's default 5-way beam search. Faster and uses noticeably less

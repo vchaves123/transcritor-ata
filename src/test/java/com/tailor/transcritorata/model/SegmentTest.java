@@ -16,16 +16,6 @@ class SegmentTest {
     }
 
     @Test
-    void appliesOffsetToStartAndEnd() {
-        Segment segment = new Segment(Duration.ofSeconds(10), Duration.ofSeconds(20), "ola");
-        Segment shifted = segment.withOffset(Duration.ofMinutes(5));
-
-        assertEquals(Duration.ofSeconds(310), shifted.start());
-        assertEquals(Duration.ofSeconds(320), shifted.end());
-        assertEquals("ola", shifted.text());
-    }
-
-    @Test
     void trimsTextOnConstruction() {
         Segment segment = new Segment(Duration.ZERO, Duration.ofSeconds(1), "  texto  ");
         assertEquals("texto", segment.text());

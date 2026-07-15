@@ -20,7 +20,7 @@ class WhisperCppEngineTest {
     @Test
     void parsesWhisperCppJsonOutputIntoSegments() throws Exception {
         Path fixture = resourcePath("whisper-sample.json");
-        WhisperCppEngine engine = new WhisperCppEngine("whisper-cli.exe", Path.of("model.bin"), "pt", 60);
+        WhisperCppEngine engine = new WhisperCppEngine("whisper-cli.exe", Path.of("model.bin"), "pt", 60, false);
 
         List<Segment> segments = engine.parseJson(fixture);
 
@@ -38,13 +38,13 @@ class WhisperCppEngineTest {
     }
 
     @Test
-    void defaultConstructorDoesNotAddBeamSizeFlags() {
-        WhisperCppEngine engine = new WhisperCppEngine("whisper-cli.exe", Path.of("model.bin"), "pt", 60);
+    void nonFastModeDoesNotAddBeamSizeFlags() {
+        WhisperCppEngine engine = new WhisperCppEngine("whisper-cli.exe", Path.of("model.bin"), "pt", 60, false);
 
         List<String> command = engine.buildCommand(Path.of("audio.wav"), Path.of("saida"), 4);
 
-        assertFalse(command.contains("-bs"), "sem fastMode nao deveria forcar beam-size");
-        assertFalse(command.contains("-bo"), "sem fastMode nao deveria forcar best-of");
+        assertFalse(command.contains("-bs"), "without fastMode it should not force beam-size");
+        assertFalse(command.contains("-bo"), "without fastMode it should not force best-of");
     }
 
     @Test
@@ -62,18 +62,8 @@ class WhisperCppEngineTest {
     }
 
     @Test
-    void explicitFastModeFalseMatchesDefaultConstructor() {
-        WhisperCppEngine engine = new WhisperCppEngine("whisper-cli.exe", Path.of("model.bin"), "pt", 60, false);
-
-        List<String> command = engine.buildCommand(Path.of("audio.wav"), Path.of("saida"), 4);
-
-        assertFalse(command.contains("-bs"));
-        assertFalse(command.contains("-bo"));
-    }
-
-    @Test
     void explicitProgressMarkerTakesPrecedence() {
-        WhisperCppEngine engine = new WhisperCppEngine("whisper-cli.exe", Path.of("model.bin"), "pt", 60);
+        WhisperCppEngine engine = new WhisperCppEngine("whisper-cli.exe", Path.of("model.bin"), "pt", 60, false);
         List<int[]> reported = new ArrayList<>();
 
         engine.reportProgress("whisper_print_progress_callback: progress = 42%",
@@ -85,7 +75,7 @@ class WhisperCppEngineTest {
 
     @Test
     void segmentEndTimestampEstimatesProgressWhenNoExplicitMarker() {
-        WhisperCppEngine engine = new WhisperCppEngine("whisper-cli.exe", Path.of("model.bin"), "pt", 60);
+        WhisperCppEngine engine = new WhisperCppEngine("whisper-cli.exe", Path.of("model.bin"), "pt", 60, false);
         List<int[]> reported = new ArrayList<>();
         long totalDurationMillis = 10_000; // 10 s de áudio total
 
@@ -99,7 +89,7 @@ class WhisperCppEngineTest {
 
     @Test
     void segmentTimestampIsLogOnlyWhenTotalDurationUnknown() {
-        WhisperCppEngine engine = new WhisperCppEngine("whisper-cli.exe", Path.of("model.bin"), "pt", 60);
+        WhisperCppEngine engine = new WhisperCppEngine("whisper-cli.exe", Path.of("model.bin"), "pt", 60, false);
         List<int[]> reported = new ArrayList<>();
 
         engine.reportProgress("[00:00:02.500 --> 00:00:05.000]  Bom dia a todos.",

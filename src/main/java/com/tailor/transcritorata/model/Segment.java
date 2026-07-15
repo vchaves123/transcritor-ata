@@ -14,11 +14,6 @@ public record Segment(Duration start, Duration end, String text) {
         text = text == null ? "" : text.trim();
     }
 
-    /** Shifts this segment forward by the given offset (used when merging chunked transcriptions). */
-    public Segment withOffset(Duration offset) {
-        return new Segment(start.plus(offset), end.plus(offset), text);
-    }
-
     public String formattedStart() {
         return format(start);
     }
