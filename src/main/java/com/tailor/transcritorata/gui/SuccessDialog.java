@@ -20,13 +20,14 @@ final class SuccessDialog {
 
     static void show(Shell parent, Path simpleMinutes, Path structuredMinutes, String aiWarning) {
         Shell dialog = new Shell(parent, SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
-        dialog.setText("Transcrição concluída");
+        AppIcon.apply(dialog);
+        dialog.setText("Transcription complete");
         dialog.setLayout(new GridLayout(1, false));
 
         Label message = new Label(dialog, SWT.WRAP);
-        String text = "A ata foi gerada com sucesso:\n" + simpleMinutes.getFileName();
+        String text = "The minutes were generated successfully:\n" + simpleMinutes.getFileName();
         if (structuredMinutes != null) {
-            text += "\ne também a ata estruturada:\n" + structuredMinutes.getFileName();
+            text += "\nas well as the structured minutes:\n" + structuredMinutes.getFileName();
         }
         message.setText(text);
         GridData messageData = new GridData(SWT.FILL, SWT.CENTER, true, false);
@@ -35,7 +36,7 @@ final class SuccessDialog {
 
         if (aiWarning != null) {
             Label warning = new Label(dialog, SWT.WRAP);
-            warning.setText("Aviso: " + aiWarning);
+            warning.setText("Warning: " + aiWarning);
             GridData warningData = new GridData(SWT.FILL, SWT.CENTER, true, false);
             warningData.widthHint = 400;
             warning.setLayoutData(warningData);
@@ -46,7 +47,7 @@ final class SuccessDialog {
         buttonsComposite.setLayoutData(new GridData(SWT.END, SWT.CENTER, true, false));
 
         Button openMinutes = new Button(buttonsComposite, SWT.PUSH);
-        openMinutes.setText("Abrir ata");
+        openMinutes.setText("Open minutes");
         openMinutes.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
@@ -55,7 +56,7 @@ final class SuccessDialog {
         });
 
         Button openFolder = new Button(buttonsComposite, SWT.PUSH);
-        openFolder.setText("Abrir pasta");
+        openFolder.setText("Open folder");
         openFolder.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
@@ -64,7 +65,7 @@ final class SuccessDialog {
         });
 
         Button close = new Button(buttonsComposite, SWT.PUSH);
-        close.setText("Fechar");
+        close.setText("Close");
         close.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {

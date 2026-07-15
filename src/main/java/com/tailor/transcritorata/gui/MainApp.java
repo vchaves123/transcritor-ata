@@ -28,7 +28,7 @@ public final class MainApp {
         System.setProperty("transcritorata.logDir", logsDir.toString());
 
         org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MainApp.class);
-        log.info("Iniciando transcritor-ata");
+        log.info("Starting transcritor-ata");
 
         Display display = new Display();
         try {

@@ -25,24 +25,25 @@ final class PreferencesDialog {
     /** @return true if the user saved changes (so the caller can refresh AI availability, etc.) */
     static boolean open(Shell parent, AppConfig config) {
         Shell dialog = new Shell(parent, SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
-        dialog.setText("Preferências");
+        AppIcon.apply(dialog);
+        dialog.setText("Preferences");
         dialog.setLayout(new GridLayout(3, false));
 
-        Text companyNameText = row(dialog, "Nome da empresa (cabeçalho da ata)",
+        Text companyNameText = row(dialog, "Company name (minutes header)",
                 config.get(AppConfig.KEY_COMPANY_NAME, ""), null);
 
-        Text ffmpegBinaryText = row(dialog, "Executável ffmpeg.exe",
+        Text ffmpegBinaryText = row(dialog, "ffmpeg.exe executable",
                 config.get(AppConfig.KEY_FFMPEG_BINARY, "ffmpeg"), browseFile(dialog, "*.exe"));
 
-        Text whisperBinaryText = row(dialog, "Executável whisper-cli.exe",
+        Text whisperBinaryText = row(dialog, "whisper-cli.exe executable",
                 config.get(AppConfig.KEY_WHISPER_BINARY, ""), browseFile(dialog, "*.exe"));
 
-        Text whisperModelText = row(dialog, "Modelo Whisper (.bin)",
+        Text whisperModelText = row(dialog, "Whisper model (.bin)",
                 config.get(AppConfig.KEY_WHISPER_MODEL, ""), browseFile(dialog, "*.bin"));
 
-        new Label(dialog, SWT.NONE); // alinha a coluna com as demais linhas
+        new Label(dialog, SWT.NONE); // aligns the column with the other rows
         Button downloadModelButton = new Button(dialog, SWT.PUSH);
-        downloadModelButton.setText("Baixar outro modelo...");
+        downloadModelButton.setText("Download another model...");
         GridData downloadModelData = new GridData(SWT.FILL, SWT.CENTER, true, false);
         downloadModelData.horizontalSpan = 2;
         downloadModelButton.setLayoutData(downloadModelData);
@@ -54,46 +55,21 @@ final class PreferencesDialog {
             }
         });
 
-        Text voskModelDirText = row(dialog, "Pasta do modelo Vosk",
-                config.get(AppConfig.KEY_VOSK_MODEL_DIR, ""), browseDirectory(dialog));
-
-        Text chunkMinutesText = row(dialog, "Dividir em blocos de N minutos (reuniões longas)",
-                Integer.toString(config.getInt(AppConfig.KEY_CHUNK_MINUTES, 20)), null);
-
-        Button chunkEnabledCheckbox = new Button(dialog, SWT.CHECK);
-        chunkEnabledCheckbox.setText("Dividir gravações longas em blocos e transcrever em paralelo");
-        chunkEnabledCheckbox.setSelection(config.getBoolean(AppConfig.KEY_CHUNK_ENABLED, false));
-        GridData chunkCheckboxData = new GridData(SWT.FILL, SWT.CENTER, true, false);
-        chunkCheckboxData.horizontalSpan = 3;
-        chunkEnabledCheckbox.setLayoutData(chunkCheckboxData);
-
-        Button fastModeCheckbox = new Button(dialog, SWT.CHECK);
-        fastModeCheckbox.setText("Priorizar velocidade e uso de memória da GPU (menos preciso)");
-        fastModeCheckbox.setToolTipText(
-                "Usa decodificação gulosa (beam-size 1) em vez do padrão do whisper.cpp (beam-size 5). "
-                        + "Mais rápido e usa bem menos memória de GPU — ajuda a evitar erros de falta de "
-                        + "memória (\"out of memory\") em placas de vídeo com pouca VRAM, ao custo de uma "
-                        + "transcrição um pouco menos precisa.");
-        fastModeCheckbox.setSelection(config.getBoolean(AppConfig.KEY_WHISPER_FAST_MODE, false));
-        GridData fastModeData = new GridData(SWT.FILL, SWT.CENTER, true, false);
-        fastModeData.horizontalSpan = 3;
-        fastModeCheckbox.setLayoutData(fastModeData);
-
         Label separator = new Label(dialog, SWT.SEPARATOR | SWT.HORIZONTAL);
         GridData separatorData = new GridData(SWT.FILL, SWT.CENTER, true, false);
         separatorData.horizontalSpan = 3;
         separator.setLayoutData(separatorData);
 
-        Text aiModelText = row(dialog, "Modelo Claude", config.get(AppConfig.KEY_AI_MODEL, "claude-sonnet-4-6"), null);
+        Text aiModelText = row(dialog, "Claude model", config.get(AppConfig.KEY_AI_MODEL, "claude-sonnet-4-6"), null);
 
-        Text aiApiKeyText = row(dialog, "Chave da API Anthropic (opcional)",
+        Text aiApiKeyText = row(dialog, "Anthropic API key (optional)",
                 config.get(AppConfig.KEY_AI_API_KEY, ""), null);
         aiApiKeyText.setEchoChar('*');
 
         Label apiKeyHint = new Label(dialog, SWT.WRAP);
-        apiKeyHint.setText("A chave será salva no arquivo de configuração local do usuário. Prefira definir a "
-                + "variável de ambiente ANTHROPIC_API_KEY quando possível. O uso da API é pago pela Anthropic "
-                + "conforme o consumo — veja https://console.anthropic.com.");
+        apiKeyHint.setText("The key will be saved in the user's local configuration file. Prefer setting the "
+                + "ANTHROPIC_API_KEY environment variable when possible. API usage is billed by Anthropic "
+                + "based on consumption — see https://console.anthropic.com.");
         GridData hintData = new GridData(SWT.FILL, SWT.CENTER, true, false);
         hintData.horizontalSpan = 3;
         hintData.widthHint = 480;
@@ -102,7 +78,7 @@ final class PreferencesDialog {
         boolean[] saved = { false };
 
         Button save = new Button(dialog, SWT.PUSH);
-        save.setText("Salvar");
+        save.setText("Save");
         GridData saveData = new GridData(SWT.END, SWT.CENTER, true, false);
         saveData.horizontalSpan = 3;
         save.setLayoutData(saveData);
@@ -113,16 +89,7 @@ final class PreferencesDialog {
                 config.set(AppConfig.KEY_FFMPEG_BINARY, ffmpegBinaryText.getText().trim());
                 config.set(AppConfig.KEY_WHISPER_BINARY, whisperBinaryText.getText().trim());
                 config.set(AppConfig.KEY_WHISPER_MODEL, whisperModelText.getText().trim());
-                config.set(AppConfig.KEY_VOSK_MODEL_DIR, voskModelDirText.getText().trim());
-                config.setBoolean(AppConfig.KEY_CHUNK_ENABLED, chunkEnabledCheckbox.getSelection());
-                config.setBoolean(AppConfig.KEY_WHISPER_FAST_MODE, fastModeCheckbox.getSelection());
                 config.set(AppConfig.KEY_AI_MODEL, aiModelText.getText().trim());
-
-                try {
-                    config.setInt(AppConfig.KEY_CHUNK_MINUTES, Integer.parseInt(chunkMinutesText.getText().trim()));
-                } catch (NumberFormatException ignored) {
-                    // mantém o valor anterior se o usuário digitou algo inválido
-                }
 
                 String newApiKey = aiApiKeyText.getText().trim();
                 boolean hadKeyBefore = config.resolveAnthropicApiKey() != null;
@@ -155,14 +122,14 @@ final class PreferencesDialog {
 
     private static boolean confirmPrivacy(Shell parent) {
         MessageBox box = new MessageBox(parent, SWT.ICON_INFORMATION | SWT.YES | SWT.NO);
-        box.setText("Privacidade — recurso de IA");
+        box.setText("Privacy — AI feature");
         box.setMessage("""
-                Ao habilitar a geração de ata estruturada com IA, o texto da transcrição da reunião \
-                será enviado à API da Anthropic pela internet para ser processado pelo modelo Claude.
+                Enabling AI-structured minutes generation will send the meeting transcript's text \
+                to the Anthropic API over the internet to be processed by the Claude model.
 
-                Sem esse recurso, o transcritor-ata funciona 100%% offline.
+                Without this feature, transcritor-ata works 100%% offline.
 
-                Deseja habilitar o envio da transcrição para a API da Anthropic?""");
+                Do you want to enable sending the transcript to the Anthropic API?""");
         return box.open() == SWT.YES;
     }
 
@@ -177,7 +144,7 @@ final class PreferencesDialog {
         text.setLayoutData(textData);
 
         Button browse = new Button(dialog, SWT.PUSH);
-        browse.setText("Localizar...");
+        browse.setText("Browse...");
         browse.setEnabled(browseAction != null);
         if (browseAction != null) {
             browse.addSelectionListener(new SelectionAdapter() {
@@ -198,13 +165,6 @@ final class PreferencesDialog {
             FileDialog fileDialog = new FileDialog(dialog, SWT.OPEN);
             fileDialog.setFilterExtensions(new String[] { pattern });
             return fileDialog.open();
-        };
-    }
-
-    private static Supplier<String> browseDirectory(Shell dialog) {
-        return () -> {
-            org.eclipse.swt.widgets.DirectoryDialog directoryDialog = new org.eclipse.swt.widgets.DirectoryDialog(dialog);
-            return directoryDialog.open();
         };
     }
 }

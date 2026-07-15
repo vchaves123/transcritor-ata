@@ -24,7 +24,8 @@ final class DependencyDialog {
 
     static void show(Shell parent, List<DependencyStatus> statuses) {
         Shell dialog = new Shell(parent, SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL | SWT.RESIZE);
-        dialog.setText("Verificação de instalação");
+        AppIcon.apply(dialog);
+        dialog.setText("Installation check");
         dialog.setLayout(new GridLayout(1, false));
 
         for (DependencyStatus status : statuses) {
@@ -32,7 +33,7 @@ final class DependencyDialog {
         }
 
         Button close = new Button(dialog, SWT.PUSH);
-        close.setText("Fechar");
+        close.setText("Close");
         close.setLayoutData(new GridData(SWT.END, SWT.CENTER, true, false));
         close.addSelectionListener(new SelectionAdapter() {
             @Override

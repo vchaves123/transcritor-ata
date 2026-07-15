@@ -10,7 +10,7 @@ import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Text;
 
-/** Friendly error dialog with an optional "ver detalhes" expander for raw process output. */
+/** Friendly error dialog with an optional "view details" expander for raw process output. */
 final class ErrorDialog {
 
     private ErrorDialog() {
@@ -18,7 +18,8 @@ final class ErrorDialog {
 
     static void show(Shell parent, String friendlyMessage, String details) {
         Shell dialog = new Shell(parent, SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL | SWT.RESIZE);
-        dialog.setText("Ocorreu um problema");
+        AppIcon.apply(dialog);
+        dialog.setText("A problem occurred");
         dialog.setLayout(new GridLayout(1, false));
 
         Label icon = new Label(dialog, SWT.WRAP);
@@ -28,7 +29,7 @@ final class ErrorDialog {
         icon.setLayoutData(messageData);
 
         Text detailsText = new Text(dialog, SWT.MULTI | SWT.BORDER | SWT.V_SCROLL | SWT.WRAP);
-        detailsText.setText(details == null || details.isBlank() ? "(sem detalhes adicionais)" : details);
+        detailsText.setText(details == null || details.isBlank() ? "(no additional details)" : details);
         detailsText.setEditable(false);
         GridData detailsData = new GridData(SWT.FILL, SWT.FILL, true, false);
         detailsData.widthHint = 420;
@@ -42,21 +43,21 @@ final class ErrorDialog {
         buttons.setLayoutData(new GridData(SWT.END, SWT.CENTER, true, false));
 
         Button toggleDetails = new Button(buttons, SWT.PUSH);
-        toggleDetails.setText("Ver detalhes");
+        toggleDetails.setText("View details");
         toggleDetails.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
                 boolean showing = detailsText.isVisible();
                 detailsText.setVisible(!showing);
                 ((GridData) detailsText.getLayoutData()).exclude = showing;
-                toggleDetails.setText(showing ? "Ver detalhes" : "Ocultar detalhes");
+                toggleDetails.setText(showing ? "View details" : "Hide details");
                 dialog.layout(true, true);
                 dialog.pack();
             }
         });
 
         Button close = new Button(buttons, SWT.PUSH);
-        close.setText("Fechar");
+        close.setText("Close");
         close.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {

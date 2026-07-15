@@ -45,23 +45,25 @@ final class ModelSetupDialog {
             return;
         }
         Shell dialog = new Shell(display, SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
-        open(dialog, display, config, "Configuração inicial — modelo de transcrição",
-                "Para transcrever reuniões, o transcritor-ata precisa de um modelo do Whisper. "
-                        + "Escolha uma opção abaixo para baixar automaticamente (o arquivo será salvo em "
-                        + MODELS_DIR + "/ e as preferências serão ajustadas sozinhas):",
-                "Pular por agora");
+        AppIcon.apply(dialog);
+        open(dialog, display, config, "Initial setup — transcription model",
+                "To transcribe meetings, transcritor-ata needs a Whisper model. "
+                        + "Choose an option below to download it automatically (the file will be saved to "
+                        + MODELS_DIR + "/ and your preferences will be adjusted automatically):",
+                "Skip for now");
     }
 
     /** Always opens the dialog, letting the user download and switch to a different model. */
     static void show(Shell parent, AppConfig config) {
         Shell dialog = new Shell(parent, SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
+        AppIcon.apply(dialog);
         open(dialog, parent.getDisplay(), config,
-                "Baixar outro modelo de transcrição",
-                "Escolha um modelo para baixar. Modelos menores usam menos memória (RAM/VRAM) e são mais "
-                        + "rápidos, mas transcrevem com menos precisão — uma boa opção se você teve problemas "
-                        + "de memória com o modelo atual. O arquivo será salvo em " + MODELS_DIR
-                        + "/ e as preferências serão ajustadas automaticamente:",
-                "Fechar");
+                "Download another transcription model",
+                "Choose a model to download. Smaller models use less memory (RAM/VRAM) and are faster, "
+                        + "but transcribe with less accuracy — a good option if you had memory problems "
+                        + "with the current model. The file will be saved to " + MODELS_DIR
+                        + "/ and your preferences will be adjusted automatically:",
+                "Close");
     }
 
     private static void open(Shell dialog, Display display, AppConfig config, String title, String introText,
@@ -99,7 +101,7 @@ final class ModelSetupDialog {
         buttons.setLayoutData(new GridData(SWT.END, SWT.CENTER, true, false));
 
         Button downloadButton = new Button(buttons, SWT.PUSH);
-        downloadButton.setText("Baixar");
+        downloadButton.setText("Download");
 
         Button closeButton = new Button(buttons, SWT.PUSH);
         closeButton.setText(closeButtonLabel);
@@ -127,9 +129,9 @@ final class ModelSetupDialog {
                 for (Button radio : radios) {
                     radio.setEnabled(false);
                 }
-                closeButton.setText("Cancelar");
+                closeButton.setText("Cancel");
                 progressBar.setVisible(true);
-                statusLabel.setText("Iniciando download de " + chosen.fileName() + "...");
+                statusLabel.setText("Starting download of " + chosen.fileName() + "...");
 
                 Thread.ofVirtual().start(() -> runDownload(display, dialog, config, chosen, progressBar,
                         statusLabel, downloadButton, closeButton, closeButtonLabel, radios, cancelled, downloading));
@@ -160,7 +162,7 @@ final class ModelSetupDialog {
                             progressBar.setSelection((int) (done * 100 / total));
                             statusLabel.setText(formatBytes(done) + " / " + formatBytes(total));
                         } else {
-                            statusLabel.setText(formatBytes(done) + " baixados...");
+                            statusLabel.setText(formatBytes(done) + " downloaded...");
                         }
                     }),
                     cancelled);
@@ -178,7 +180,7 @@ final class ModelSetupDialog {
                 if (dialog.isDisposed()) {
                     return;
                 }
-                statusLabel.setText("Falha ao baixar: " + ex.getMessage());
+                statusLabel.setText("Download failed: " + ex.getMessage());
                 downloadButton.setEnabled(true);
                 for (Button radio : radios) {
                     radio.setEnabled(true);
