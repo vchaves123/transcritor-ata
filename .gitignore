@@ -25,7 +25,6 @@ logs/
 # que sao pequenos (~32 MB) e essenciais ao build.
 *.bin
 /models/
-vosk-model*/
 !src/main/resources/models/
 
 # Ferramentas de terceiros baixadas localmente (LIUM_SpkDiarization, etc.)

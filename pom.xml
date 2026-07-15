@@ -19,7 +19,6 @@
     <poi.version>5.3.0</poi.version>
     <jackson.version>2.17.2</jackson.version>
     <slf4j.version>2.0.16</slf4j.version>
-    <vosk.version>0.3.45</vosk.version>
     <anthropic.version>2.48.0</anthropic.version>
     <junit.version>5.10.3</junit.version>
     <main.class>com.tailor.transcritorata.gui.MainApp</main.class>
@@ -43,13 +42,6 @@
       <groupId>com.fasterxml.jackson.datatype</groupId>
       <artifactId>jackson-datatype-jsr310</artifactId>
       <version>${jackson.version}</version>
-    </dependency>
-
-    <!-- Vosk (motor de transcricao offline alternativo) -->
-    <dependency>
-      <groupId>com.alphacephei</groupId>
-      <artifactId>vosk</artifactId>
-      <version>${vosk.version}</version>
     </dependency>
 
     <!-- SDK oficial da Anthropic (estruturacao de ata via Claude) -->
