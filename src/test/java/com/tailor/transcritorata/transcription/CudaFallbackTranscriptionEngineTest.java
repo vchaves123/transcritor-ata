@@ -19,10 +19,10 @@ import static org.mockito.Mockito.when;
 
 class CudaFallbackTranscriptionEngineTest {
 
-    // Saida real capturada de um caso reportado por um usuario com GPU de 2 GB de VRAM (MX330).
+    // Real output captured from a case reported by a user with a 2 GB VRAM GPU (MX330).
     private static final String CUDA_OOM_OUTPUT = """
             whisper_model_load:        CUDA0 total size =  1533.14 MB
-            [00:00:00.000 --> 00:00:28.000]   Bom dia, Bruno. Professoral, bom dia. Bom dia.
+            [00:00:00.000 --> 00:00:28.000]   Good morning, Bruno. Professor, good morning. Good morning.
             CUDA error: out of memory
               current device: 0, in function alloc at D:\\a\\whisper.cpp\\whisper.cpp\\ggml\\src\\ggml-cuda\\ggml-cuda.cu:550
               cuMemSetAccess((CUdeviceptr)((char *)(pool_addr) + pool_size), reserve_size, &access, 1)
@@ -30,7 +30,7 @@ class CudaFallbackTranscriptionEngineTest {
             """;
 
     private static final List<Segment> CPU_RESULT = List.of(
-            new Segment(Duration.ZERO, Duration.ofSeconds(28), "Bom dia, Bruno. Professor, bom dia. Bom dia."));
+            new Segment(Duration.ZERO, Duration.ofSeconds(28), "Good morning, Bruno. Professor, good morning. Good morning."));
 
     @Test
     void fallsBackToCpuWhenGpuRunsOutOfMemory() throws Exception {
@@ -39,7 +39,7 @@ class CudaFallbackTranscriptionEngineTest {
 
         when(primary.transcribe(any(), any(), any()))
                 .thenThrow(new ExternalProcessException(
-                        "O processo externo terminou com código de erro 1.", CUDA_OOM_OUTPUT));
+                        "The external process exited with error code 1.", CUDA_OOM_OUTPUT));
         when(cpuFallback.transcribe(any(), any(), any())).thenReturn(CPU_RESULT);
 
         CudaFallbackTranscriptionEngine engine = new CudaFallbackTranscriptionEngine(primary, cpuFallback);
@@ -55,7 +55,7 @@ class CudaFallbackTranscriptionEngineTest {
 
         when(primary.transcribe(any(), any(), any()))
                 .thenThrow(new ExternalProcessException(
-                        "O processo externo terminou com código de erro 1.", "modelo nao encontrado"));
+                        "The external process exited with error code 1.", "model not found"));
 
         CudaFallbackTranscriptionEngine engine = new CudaFallbackTranscriptionEngine(primary, cpuFallback);
 
@@ -79,7 +79,7 @@ class CudaFallbackTranscriptionEngineTest {
     @Test
     void detectsCudaOutOfMemorySignatureInProcessOutput() {
         ExternalProcessException match = new ExternalProcessException("erro", CUDA_OOM_OUTPUT);
-        ExternalProcessException noMatch = new ExternalProcessException("erro", "algum outro problema qualquer");
+        ExternalProcessException noMatch = new ExternalProcessException("error", "some other unrelated problem");
 
         assertEquals(true, CudaFallbackTranscriptionEngine.isCudaOutOfMemory(match));
         assertEquals(false, CudaFallbackTranscriptionEngine.isCudaOutOfMemory(noMatch));

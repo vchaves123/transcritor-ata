@@ -42,12 +42,12 @@ public final class CudaFallbackTranscriptionEngine implements TranscriptionEngin
             if (!isCudaOutOfMemory(e)) {
                 throw e;
             }
-            LOG.warn("whisper-cli falhou por falta de memória na GPU; tentando novamente com CPU. Detalhes: {}",
+            LOG.warn("whisper-cli failed due to insufficient GPU memory; retrying on CPU. Details: {}",
                     e.getMessage());
             if (listener != null) {
                 listener.onProgress(
-                        "A GPU não tinha memória suficiente para este áudio. Tentando novamente usando a CPU "
-                                + "(mais lento, mas deve funcionar)...",
+                        "The GPU did not have enough memory for this audio. Retrying using the CPU "
+                                + "(slower, but should work)...",
                         -1);
             }
             return cpuFallback.transcribe(wav, listener, handle);

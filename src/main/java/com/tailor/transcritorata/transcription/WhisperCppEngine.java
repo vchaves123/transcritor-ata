@@ -8,6 +8,10 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.sound.sampled.AudioFileFormat;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.UnsupportedAudioFileException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +30,11 @@ public final class WhisperCppEngine implements TranscriptionEngine {
 
     private static final Logger LOG = LoggerFactory.getLogger(WhisperCppEngine.class);
     private static final Pattern PROGRESS_PATTERN = Pattern.compile("progress\\s*=\\s*(\\d+)%");
+    // Matches the end timestamp of whisper-cli's per-segment output lines, e.g.
+    // "[00:00:00.000 --> 00:00:02.500]  transcribed text", used as a progress fallback since
+    // recent whisper.cpp builds don't always print an explicit "progress = N%" line.
+    private static final Pattern SEGMENT_END_TIMESTAMP_PATTERN =
+            Pattern.compile("-->\\s*(\\d{2}):(\\d{2}):(\\d{2})\\.(\\d{3})]");
 
     private final String whisperCliExecutable;
     private final Path modelPath;
@@ -62,16 +71,17 @@ public final class WhisperCppEngine implements TranscriptionEngine {
 
         int threads = Runtime.getRuntime().availableProcessors();
         List<String> command = buildCommand(wav, outputPrefix, threads);
-        LOG.info("Transcrevendo {} com whisper.cpp (modelo {}, {} threads, fastMode={})",
+        LOG.info("Transcribing {} with whisper.cpp (model {}, {} threads, fastMode={})",
                 wav, modelPath, threads, fastMode);
 
+        long totalDurationMillis = wavDurationMillis(wav);
         try {
-            ProcessRunner.run(command, handle, timeoutSeconds, line -> reportProgress(line, listener));
+            ProcessRunner.run(command, handle, timeoutSeconds, line -> reportProgress(line, listener, totalDurationMillis));
 
             Path jsonFile = Path.of(outputPrefix + ".json");
             if (!Files.exists(jsonFile)) {
                 throw new ExternalProcessException(
-                        "O whisper.cpp não gerou o arquivo de transcrição esperado.", "");
+                        "whisper.cpp did not generate the expected transcription file.", "");
             }
             return parseJson(jsonFile);
         } finally {
@@ -96,21 +106,48 @@ public final class WhisperCppEngine implements TranscriptionEngine {
 
     /**
      * Forwards whisper-cli's console output to the listener. Lines matching whisper.cpp's
-     * {@code progress = N%} marker update the progress bar; every other non-blank line (which
-     * includes the {@code [00:00:00.000 --> 00:00:02.500]  texto} segment lines whisper-cli
-     * prints as it transcribes) is forwarded as a log-only message using {@code percent = -1},
-     * a sentinel the GUI recognizes to mean "append to the log without moving the progress bar".
+     * {@code progress = N%} marker update the progress bar directly; when that marker isn't
+     * printed (some builds don't emit it), the end timestamp of each per-segment output line
+     * ({@code [00:00:00.000 --> 00:00:02.500]  text}) is used instead, as a fraction of the
+     * audio's total duration. Everything else is forwarded as a log-only message using
+     * {@code percent = -1}, a sentinel the GUI recognizes to mean "append to the log without
+     * moving the progress indicator".
      */
-    private void reportProgress(String line, ProgressListener listener) {
+    void reportProgress(String line, ProgressListener listener, long totalDurationMillis) {
         if (listener == null || line.isBlank()) {
             return;
         }
-        Matcher matcher = PROGRESS_PATTERN.matcher(line);
-        if (matcher.find()) {
-            int percent = Integer.parseInt(matcher.group(1));
-            listener.onProgress("Transcrevendo...", percent);
+        Matcher progressMatcher = PROGRESS_PATTERN.matcher(line);
+        if (progressMatcher.find()) {
+            listener.onProgress("Transcribing...", Integer.parseInt(progressMatcher.group(1)));
+            return;
+        }
+        Matcher timestampMatcher = SEGMENT_END_TIMESTAMP_PATTERN.matcher(line);
+        if (totalDurationMillis > 0 && timestampMatcher.find()) {
+            long endMillis = (Long.parseLong(timestampMatcher.group(1)) * 3600_000L)
+                    + (Long.parseLong(timestampMatcher.group(2)) * 60_000L)
+                    + (Long.parseLong(timestampMatcher.group(3)) * 1000L)
+                    + Long.parseLong(timestampMatcher.group(4));
+            int percent = (int) Math.min(99, (endMillis * 100) / totalDurationMillis);
+            listener.onProgress(line.strip(), percent);
         } else {
             listener.onProgress(line.strip(), -1);
+        }
+    }
+
+    /** @return the WAV's duration in milliseconds, or -1 if it couldn't be read. */
+    private static long wavDurationMillis(Path wav) {
+        try {
+            AudioFileFormat format = AudioSystem.getAudioFileFormat(wav.toFile());
+            long frameLength = format.getFrameLength();
+            float frameRate = format.getFormat().getFrameRate();
+            if (frameLength <= 0 || frameRate <= 0) {
+                return -1;
+            }
+            return Math.round((frameLength / frameRate) * 1000);
+        } catch (UnsupportedAudioFileException | IOException e) {
+            LOG.debug("Could not read the duration of {} to estimate progress: {}", wav, e.getMessage());
+            return -1;
         }
     }
 

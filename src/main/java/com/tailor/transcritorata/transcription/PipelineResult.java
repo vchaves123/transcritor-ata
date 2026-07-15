@@ -10,7 +10,7 @@ import com.tailor.transcritorata.model.Segment;
  *
  * @param simpleMinutesPath     always populated: the plain ata is written before AI structuring runs
  * @param structuredMinutesPath populated only when AI structuring was enabled and succeeded
- * @param aiWarning             friendly Portuguese message when AI structuring was attempted but failed
+ * @param aiWarning             friendly message when AI structuring was attempted but failed
  * @param segments              the final, offset-merged transcription
  */
 public record PipelineResult(Path simpleMinutesPath, Path structuredMinutesPath, String aiWarning,

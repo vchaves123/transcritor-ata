@@ -1,5 +1,8 @@
 package com.tailor.transcritorata.audio;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.function.Consumer;
@@ -40,28 +43,45 @@ public final class AudioExtractor {
                 "-c:a", "pcm_s16le",
                 outputWav.toString());
 
-        LOG.info("Extraindo áudio de {} para {}", input, outputWav);
+        LOG.info("Extracting audio from {} to {}", input, outputWav);
         ProcessRunner.run(command, handle, timeoutSeconds, forward(outputLineListener));
     }
 
     /**
-     * Splits {@code inputWav} into fixed-length chunks using ffmpeg's segment muxer, writing
-     * files named {@code <outputPrefix>-000.wav}, {@code -001.wav}, etc.
+     * Concatenates several WAV files (already extracted via {@link #extractToWav}, so all share
+     * the same 16&nbsp;kHz mono PCM16 format) into a single WAV, in list order, using ffmpeg's
+     * concat demuxer with stream copy (no re-encoding, since the format already matches).
      */
-    public void splitIntoChunks(Path inputWav, Path outputDir, String outputPrefix, int chunkMinutes,
-            ProcessRunner.Handle handle, Consumer<String> outputLineListener) throws ExternalProcessException {
-        Path pattern = outputDir.resolve(outputPrefix + "-%03d.wav");
-        List<String> command = List.of(
-                ffmpegExecutable,
-                "-y",
-                "-i", inputWav.toString(),
-                "-f", "segment",
-                "-segment_time", Integer.toString(chunkMinutes * 60),
-                "-c", "copy",
-                pattern.toString());
+    public void concatenate(List<Path> wavFiles, Path outputWav, ProcessRunner.Handle handle,
+            Consumer<String> outputLineListener) throws ExternalProcessException, IOException {
+        if (wavFiles.size() == 1) {
+            Files.copy(wavFiles.get(0), outputWav, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            return;
+        }
 
-        LOG.info("Dividindo {} em blocos de {} minutos", inputWav, chunkMinutes);
-        ProcessRunner.run(command, handle, timeoutSeconds, forward(outputLineListener));
+        Path listFile = Files.createTempFile(outputWav.getParent(), "concat-list-", ".txt");
+        StringBuilder listContents = new StringBuilder();
+        for (Path wav : wavFiles) {
+            listContents.append("file '").append(wav.toAbsolutePath().toString().replace("'", "'\\''"))
+                    .append("'\n");
+        }
+        Files.writeString(listFile, listContents.toString(), StandardCharsets.UTF_8);
+
+        try {
+            List<String> command = List.of(
+                    ffmpegExecutable,
+                    "-y",
+                    "-f", "concat",
+                    "-safe", "0",
+                    "-i", listFile.toString(),
+                    "-c", "copy",
+                    outputWav.toString());
+
+            LOG.info("Concatenating {} audio files into {}", wavFiles.size(), outputWav);
+            ProcessRunner.run(command, handle, timeoutSeconds, forward(outputLineListener));
+        } finally {
+            Files.deleteIfExists(listFile);
+        }
     }
 
     private static Consumer<String> forward(Consumer<String> outputLineListener) {
