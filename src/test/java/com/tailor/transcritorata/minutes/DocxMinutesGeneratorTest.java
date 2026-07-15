@@ -32,7 +32,7 @@ class DocxMinutesGeneratorTest {
     @Test
     void generatesSimpleMinutesWithTitleMetadataAndSegments(@TempDir Path tempDir) throws IOException {
         Path output = tempDir.resolve("minutes.docx");
-        new DocxMinutesGenerator("Tailor").generateSimpleMinutesAttributed(output, METADATA, UNATTRIBUTED_SEGMENTS);
+        new DocxMinutesGenerator().generateSimpleMinutesAttributed(output, METADATA, UNATTRIBUTED_SEGMENTS);
 
         try (XWPFDocument document = new XWPFDocument(java.nio.file.Files.newInputStream(output))) {
             String fullText = extractText(document);
@@ -51,7 +51,7 @@ class DocxMinutesGeneratorTest {
                 new AttributedSegment(SEGMENTS.get(1), "Speaker 2"));
 
         Path output = tempDir.resolve("minutes-speakers.docx");
-        new DocxMinutesGenerator("Tailor").generateSimpleMinutesAttributed(output, METADATA, attributed);
+        new DocxMinutesGenerator().generateSimpleMinutesAttributed(output, METADATA, attributed);
 
         try (XWPFDocument document = new XWPFDocument(java.nio.file.Files.newInputStream(output))) {
             String fullText = extractText(document);

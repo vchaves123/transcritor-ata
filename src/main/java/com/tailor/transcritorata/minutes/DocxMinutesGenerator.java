@@ -35,10 +35,7 @@ public final class DocxMinutesGenerator {
     private static final int FOOTER_SIZE = 9;
     private static final String ACCENT_COLOR = "1F4E79";
 
-    private final String companyName;
-
-    public DocxMinutesGenerator(String companyName) {
-        this.companyName = companyName == null ? "" : companyName;
+    public DocxMinutesGenerator() {
     }
 
     /** Generates the plain minutes: title, metadata table, and the transcription as timestamped paragraphs. */
@@ -62,7 +59,7 @@ public final class DocxMinutesGenerator {
                 ? header.getParagraphArray(0) : header.createParagraph();
         headerParagraph.setAlignment(ParagraphAlignment.RIGHT);
         XWPFRun headerRun = headerParagraph.createRun();
-        headerRun.setText(companyName.isBlank() ? "Meeting Minutes" : companyName);
+        headerRun.setText("Meeting Minutes");
         headerRun.setFontFamily(FONT_FAMILY);
         headerRun.setFontSize(FOOTER_SIZE);
         headerRun.setColor("808080");

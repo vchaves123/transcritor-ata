@@ -83,10 +83,10 @@ If you'd rather download it yourself: https://huggingface.co/ggerganov/whisper.c
 
 Save the file and select it in the application's preferences.
 
-### 4. (Optional, experimental) Speaker identification
+### 4. (Optional) Speaker identification
 
-No extra installation or download is required. Simply check the "Identify speakers in the
-transcription (experimental)" checkbox before transcribing, so the minutes indicate who spoke
+No extra installation or download is required. Simply check the "Identify participants in the
+transcription" checkbox in Preferences before transcribing, so the minutes indicate who spoke
 each segment (`Speaker 1`, `Speaker 2`, ...).
 
 This feature runs **entirely within the program itself**, with no external process: it's a Java

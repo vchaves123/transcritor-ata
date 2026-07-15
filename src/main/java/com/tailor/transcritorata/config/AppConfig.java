@@ -28,7 +28,6 @@ public final class AppConfig {
     public static final String KEY_WHISPER_FAST_MODE = "whisper.fastMode";
     public static final String KEY_LAST_VIDEO_DIR = "lastVideoDir";
     public static final String KEY_OUTPUT_DIR = "outputDir";
-    public static final String KEY_COMPANY_NAME = "docx.companyName";
     public static final String KEY_PROCESS_TIMEOUT_SECONDS = "process.timeoutSeconds";
     public static final String KEY_DIARIZATION_ENABLED = "diarization.enabled";
 
@@ -68,7 +67,6 @@ public final class AppConfig {
         properties.putIfAbsent(KEY_FFMPEG_BINARY, "ffmpeg");
         properties.putIfAbsent(KEY_WHISPER_FAST_MODE, "false");
         properties.putIfAbsent(KEY_PROCESS_TIMEOUT_SECONDS, "3600");
-        properties.putIfAbsent(KEY_COMPANY_NAME, "");
         properties.putIfAbsent(KEY_DIARIZATION_ENABLED, "false");
     }
 

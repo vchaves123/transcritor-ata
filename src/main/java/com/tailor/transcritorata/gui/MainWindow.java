@@ -64,10 +64,11 @@ public final class MainWindow {
     private Label outputDirLabel;
     private Button outputDirButton;
     private MenuItem preferencesMenuItem;
-    private Button diarizationCheckbox;
-    private Button fastModeCheckbox;
     private Button transcribeButton;
     private Button cancelButton;
+    private Label elapsedTimeLabel;
+    private long transcriptionStartMillis;
+    private volatile boolean elapsedTimerActive;
 
     private CollapsibleSection audioSection;
     private CollapsibleSection transcriptionSection;
@@ -98,7 +99,6 @@ public final class MainWindow {
     public void open() {
         shell.open();
         refreshDependencyState();
-        refreshDiarizationAvailability();
     }
 
     public boolean isDisposed() {
@@ -112,39 +112,8 @@ public final class MainWindow {
         buildMenu();
         buildFileListSection();
 
-        diarizationCheckbox = new Button(shell, SWT.CHECK);
-        diarizationCheckbox.setText("Identify participants in the transcription (experimental)");
-        diarizationCheckbox.setSelection(config.getBoolean(AppConfig.KEY_DIARIZATION_ENABLED, false));
-        diarizationCheckbox.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
-        diarizationCheckbox.addSelectionListener(new SelectionAdapter() {
-            @Override
-            public void widgetSelected(SelectionEvent e) {
-                config.setBoolean(AppConfig.KEY_DIARIZATION_ENABLED, diarizationCheckbox.getSelection());
-                config.save();
-                refreshDiarizationSectionStatus();
-            }
-        });
-
-        fastModeCheckbox = new Button(shell, SWT.CHECK);
-        fastModeCheckbox.setText("Prioritize speed and GPU memory usage (less accurate)");
-        fastModeCheckbox.setToolTipText(
-                "Uses greedy decoding (beam-size 1) instead of whisper.cpp's default (beam-size 5) from "
-                        + "the very first attempt. Faster and uses noticeably less GPU memory, at the cost of "
-                        + "a slightly less accurate transcription. Note: the app already automatically switches "
-                        + "to fast mode and/or a smaller model on its own if the GPU runs out of memory — check "
-                        + "this only if you'd rather skip straight to fast mode instead of waiting for that.");
-        fastModeCheckbox.setSelection(config.getBoolean(AppConfig.KEY_WHISPER_FAST_MODE, false));
-        fastModeCheckbox.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
-        fastModeCheckbox.addSelectionListener(new SelectionAdapter() {
-            @Override
-            public void widgetSelected(SelectionEvent e) {
-                config.setBoolean(AppConfig.KEY_WHISPER_FAST_MODE, fastModeCheckbox.getSelection());
-                config.save();
-            }
-        });
-
         Composite actionsRow = new Composite(shell, SWT.NONE);
-        GridLayout actionsLayout = new GridLayout(2, false);
+        GridLayout actionsLayout = new GridLayout(3, false);
         actionsLayout.marginWidth = 0;
         actionsLayout.marginHeight = 0;
         actionsRow.setLayout(actionsLayout);
@@ -168,6 +137,10 @@ public final class MainWindow {
                 cancelTranscription();
             }
         });
+
+        elapsedTimeLabel = new Label(actionsRow, SWT.NONE);
+        elapsedTimeLabel.setText("Elapsed time: 00:00");
+        elapsedTimeLabel.setLayoutData(new GridData(SWT.END, SWT.CENTER, true, false));
 
         buildPhaseSections();
         refreshDiarizationSectionStatus();
@@ -324,6 +297,7 @@ public final class MainWindow {
             public void widgetSelected(SelectionEvent e) {
                 if (PreferencesDialog.open(shell, config)) {
                     refreshDependencyState();
+                    refreshDiarizationSectionStatus();
                 }
             }
         });
@@ -339,6 +313,17 @@ public final class MainWindow {
             @Override
             public void widgetSelected(SelectionEvent e) {
                 showDependencyDialog();
+            }
+        });
+
+        new MenuItem(helpMenu, SWT.SEPARATOR);
+
+        MenuItem about = new MenuItem(helpMenu, SWT.PUSH);
+        about.setText("About transcritor-ata...");
+        about.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                AboutDialog.show(shell);
             }
         });
     }
@@ -500,18 +485,9 @@ public final class MainWindow {
         });
     }
 
-    private void refreshDiarizationAvailability() {
-        // The speaker identification models are bundled in the jar (ONNX), so the feature is
-        // always available — no external dependency or additional configuration needed.
-        diarizationCheckbox.setEnabled(true);
-        diarizationCheckbox.setToolTipText(
-                "Experimental feature: identifies participants using local AI models "
-                        + "(without sending audio over the internet). Accuracy may vary depending on the recording.");
-    }
-
     private void refreshDiarizationSectionStatus() {
         if (diarizationSection != null) {
-            diarizationSection.setStatus(diarizationCheckbox.getSelection() ? "" : "Disabled");
+            diarizationSection.setStatus(config.getBoolean(AppConfig.KEY_DIARIZATION_ENABLED, false) ? "" : "Disabled");
         }
     }
 
@@ -532,11 +508,7 @@ public final class MainWindow {
             return;
         }
 
-        // Reads the widget state here, on the UI thread and before locking down the controls
-        // (which disables this same checkbox) — the background thread must not touch SWT
-        // widgets (it would throw SWTException: Invalid thread access), and reading after
-        // disabling would always yield "false".
-        boolean diarizationEnabled = diarizationCheckbox.getEnabled() && diarizationCheckbox.getSelection();
+        boolean diarizationEnabled = config.getBoolean(AppConfig.KEY_DIARIZATION_ENABLED, false);
         List<Path> videos = selectedVideos.stream().map(VideoFileInfo::path).toList();
 
         setControlsEnabledWhileBusy(true);
@@ -549,6 +521,7 @@ public final class MainWindow {
         minutesSection.setStatus("");
         diarizationSection.setStatus(diarizationEnabled ? "" : "Disabled");
         currentTranscriptionAttempt = "";
+        startElapsedTimer();
 
         ProcessRunner.Handle handle = new ProcessRunner.Handle();
         currentHandle = handle;
@@ -585,8 +558,6 @@ public final class MainWindow {
         addButton.setEnabled(!busy);
         outputDirButton.setEnabled(!busy);
         preferencesMenuItem.setEnabled(!busy);
-        diarizationCheckbox.setEnabled(!busy);
-        fastModeCheckbox.setEnabled(!busy);
         cancelButton.setEnabled(busy);
         if (busy) {
             fileListWidget.deselectAll();
@@ -595,9 +566,42 @@ public final class MainWindow {
             moveUpButton.setEnabled(false);
             moveDownButton.setEnabled(false);
         } else {
+            stopElapsedTimer();
             refreshFileListButtons();
             refreshDependencyState();
         }
+    }
+
+    /** Starts showing "Elapsed time: mm:ss" next to the action buttons, ticking every second. */
+    private void startElapsedTimer() {
+        transcriptionStartMillis = System.currentTimeMillis();
+        elapsedTimerActive = true;
+        setElapsedTimeLabelText("Elapsed time: 00:00");
+        display.timerExec(1000, this::tickElapsedTimer);
+    }
+
+    private void tickElapsedTimer() {
+        if (!elapsedTimerActive || shell.isDisposed()) {
+            return;
+        }
+        Duration elapsed = Duration.ofMillis(System.currentTimeMillis() - transcriptionStartMillis);
+        setElapsedTimeLabelText("Elapsed time: " + formatDuration(elapsed));
+        display.timerExec(1000, this::tickElapsedTimer);
+    }
+
+    /**
+     * Setting a Label's text alone doesn't always make GridLayout recompute the widget's bounds
+     * within its (already grab-expanded) cell, since the cell's width was fixed at the last full
+     * layout pass — forcing a targeted re-layout of just this widget guarantees it's visible as
+     * soon as the text changes, without re-laying out the whole window.
+     */
+    private void setElapsedTimeLabelText(String text) {
+        elapsedTimeLabel.setText(text);
+        elapsedTimeLabel.getParent().layout(new org.eclipse.swt.widgets.Control[] { elapsedTimeLabel });
+    }
+
+    private void stopElapsedTimer() {
+        elapsedTimerActive = false;
     }
 
     private void runPipeline(ProcessRunner.Handle handle, List<Path> videos, boolean diarizationEnabled) {
@@ -692,7 +696,7 @@ public final class MainWindow {
 
         TranscriptionEngine engine = buildWhisperEngine(timeout);
 
-        DocxMinutesGenerator generator = new DocxMinutesGenerator(config.get(AppConfig.KEY_COMPANY_NAME, ""));
+        DocxMinutesGenerator generator = new DocxMinutesGenerator();
 
         SpeakerDiarizer diarizer = diarizationEnabled ? new OnnxSpeakerDiarizer() : null;
 
