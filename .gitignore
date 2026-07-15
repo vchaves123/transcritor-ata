@@ -21,11 +21,12 @@ bin/
 logs/
 *.log
 
-# Modelos (grandes, nao versionar) -- mas NAO os modelos ONNX embutidos no jar (src/main/resources/models),
-# que sao pequenos (~32 MB) e essenciais ao build.
+# Modelos (grandes, nao versionar) -- mas NAO os modelos embutidos no jar (src/main/resources/models),
+# que sao pequenos e essenciais ao build (ONNX de diarizacao + VAD do whisper.cpp).
 *.bin
 /models/
 !src/main/resources/models/
+!src/main/resources/models/*.bin
 
 # Ferramentas de terceiros baixadas localmente (LIUM_SpkDiarization, etc.)
 tools/

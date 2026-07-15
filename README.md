@@ -67,6 +67,14 @@ Preferences. It swaps beam search (whisper.cpp's default) for greedy decoding, w
 significantly less VRAM and is faster, at the cost of some accuracy. In addition, the app already
 automatically retries transcription on the CPU if the GPU runs out of memory mid-transcription.
 
+**Recordings with long silences**: whisper.cpp is enabled to use Voice Activity Detection (VAD)
+automatically for every transcription. Instead of blindly processing fixed 30-second windows
+regardless of content, it first detects where actual speech happens and only transcribes those
+stretches — this avoids the hallucinated/repeated text and missed short utterances that whisper.cpp
+otherwise produces on recordings with sparse speech surrounded by long stretches of silence. The
+VAD model (~900 KB) is bundled in the jar and extracted automatically on first use; no extra setup
+is needed.
+
 ### 3. A Whisper model (`.bin`)
 
 **No need to download it manually**: the first time the application opens without a valid model

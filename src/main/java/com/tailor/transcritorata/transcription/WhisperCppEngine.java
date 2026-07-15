@@ -96,6 +96,7 @@ public final class WhisperCppEngine implements TranscriptionEngine {
         if (fastMode) {
             command.addAll(List.of("-bs", "1", "-bo", "1"));
         }
+        VadModelProvider.resolve().ifPresent(vadModel -> command.addAll(List.of("--vad", "-vm", vadModel.toString())));
         command.add(wav.toString());
         return command;
     }
