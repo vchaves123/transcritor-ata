@@ -2,7 +2,11 @@ package com.tailor.transcritorata.gui;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionAdapter;
@@ -10,16 +14,14 @@ import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
-import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.DirectoryDialog;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.FileDialog;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.MenuItem;
-import org.eclipse.swt.widgets.ProgressBar;
 import org.eclipse.swt.widgets.Shell;
-import org.eclipse.swt.widgets.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,55 +33,76 @@ import com.tailor.transcritorata.audio.AudioExtractor;
 import com.tailor.transcritorata.audio.ExternalProcessException;
 import com.tailor.transcritorata.audio.ProcessCancelledException;
 import com.tailor.transcritorata.audio.ProcessRunner;
+import com.tailor.transcritorata.audio.VideoProbe;
 import com.tailor.transcritorata.config.AppConfig;
 import com.tailor.transcritorata.diarization.SpeakerDiarizer;
 import com.tailor.transcritorata.diarization.onnx.OnnxSpeakerDiarizer;
 import com.tailor.transcritorata.deps.DependencyChecker;
 import com.tailor.transcritorata.deps.DependencyStatus;
+import com.tailor.transcritorata.deps.ExecutableLocator;
+import com.tailor.transcritorata.deps.GpuDetector;
 import com.tailor.transcritorata.minutes.DocxMinutesGenerator;
 import com.tailor.transcritorata.transcription.CudaFallbackTranscriptionEngine;
 import com.tailor.transcritorata.transcription.PipelineResult;
 import com.tailor.transcritorata.transcription.TranscriptionEngine;
 import com.tailor.transcritorata.transcription.TranscriptionPipeline;
-import com.tailor.transcritorata.transcription.VoskEngine;
 import com.tailor.transcritorata.transcription.WhisperCppEngine;
 
 /** The application's single main window. */
 public final class MainWindow {
 
     private static final Logger LOG = LoggerFactory.getLogger(MainWindow.class);
-    private static final String ENGINE_WHISPER = "Whisper (recomendado)";
-    private static final String ENGINE_VOSK = "Vosk";
     private static final long DEFAULT_TIMEOUT_SECONDS = 3600;
+    // Above this percentage of VRAM occupied by the model alone (before even loading audio/activations),
+    // we consider that the GPU probably won't have enough memory left over during transcription.
+    private static final double FAST_MODE_VRAM_THRESHOLD = 0.85;
 
     private final Display display;
     private final AppConfig config;
     private final Shell shell;
 
-    private Label videoFileLabel;
-    private Combo engineCombo;
+    private org.eclipse.swt.widgets.List fileListWidget;
+    private Button addButton;
+    private Button removeFileButton;
+    private Button moveUpButton;
+    private Button moveDownButton;
+    private Label totalsLabel;
+    private Label outputDirLabel;
+    private Button outputDirButton;
+    private Button preferencesButton;
     private Button aiCheckbox;
     private Button diarizationCheckbox;
+    private Button fastModeCheckbox;
     private Button transcribeButton;
     private Button cancelButton;
-    private ProgressBar progressBar;
-    private Text logText;
-    private Text diarizationLogText;
 
-    private Path selectedVideo;
+    private CollapsibleSection audioSection;
+    private CollapsibleSection transcriptionSection;
+    private CollapsibleSection diarizationSection;
+    private CollapsibleSection minutesSection;
+
+    private final List<VideoFileInfo> selectedVideos = new ArrayList<>();
     private volatile ProcessRunner.Handle currentHandle;
 
     public MainWindow(Display display, AppConfig config) {
         this.display = display;
         this.config = config;
         this.shell = new Shell(display);
+        AppIcon.apply(shell);
         build();
+        // pack() instead of a fixed size: with the 4 phases starting collapsed, a fixed size large
+        // enough to fit them expanded left an empty leftover space at the bottom of the window.
+        shell.pack();
+        org.eclipse.swt.graphics.Point packedSize = shell.getSize();
+        shell.setSize(Math.max(640, packedSize.x), packedSize.y);
+        shell.setMinimumSize(640, packedSize.y);
     }
 
     public void open() {
         shell.open();
         refreshDependencyState();
         refreshAiAvailability();
+        maybeAutoEnableFastMode();
     }
 
     public boolean isDisposed() {
@@ -87,44 +110,14 @@ public final class MainWindow {
     }
 
     private void build() {
-        shell.setText("Transcritor de Ata de Reunião");
-        shell.setLayout(new GridLayout(3, false));
-        shell.setSize(640, 520);
+        shell.setText("Transcritor-ata — Meeting Minutes Transcriber");
+        shell.setLayout(new GridLayout(1, false));
 
         buildMenu();
+        buildFileListSection();
 
-        Button chooseVideoButton = new Button(shell, SWT.PUSH);
-        chooseVideoButton.setText("Escolher vídeo...");
-        chooseVideoButton.addSelectionListener(new SelectionAdapter() {
-            @Override
-            public void widgetSelected(SelectionEvent e) {
-                chooseVideo();
-            }
-        });
-
-        videoFileLabel = new Label(shell, SWT.NONE);
-        videoFileLabel.setText("Nenhum arquivo selecionado");
-        GridData videoLabelData = new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1);
-        videoFileLabel.setLayoutData(videoLabelData);
-
-        Label engineLabel = new Label(shell, SWT.NONE);
-        engineLabel.setText("Motor de transcrição:");
-
-        engineCombo = new Combo(shell, SWT.READ_ONLY);
-        engineCombo.setItems(ENGINE_WHISPER, ENGINE_VOSK);
-        engineCombo.select("vosk".equalsIgnoreCase(config.get(AppConfig.KEY_ENGINE, "whisper")) ? 1 : 0);
-        engineCombo.addSelectionListener(new SelectionAdapter() {
-            @Override
-            public void widgetSelected(SelectionEvent e) {
-                config.set(AppConfig.KEY_ENGINE, engineCombo.getSelectionIndex() == 1 ? "vosk" : "whisper");
-                config.save();
-                refreshDependencyState();
-            }
-        });
-        engineCombo.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
-
-        Button preferencesButton = new Button(shell, SWT.PUSH);
-        preferencesButton.setText("Preferências...");
+        preferencesButton = new Button(shell, SWT.PUSH);
+        preferencesButton.setText("Preferences...");
         preferencesButton.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
@@ -132,14 +125,16 @@ public final class MainWindow {
                     refreshDependencyState();
                     refreshAiAvailability();
                 }
+                // The Whisper model may have changed even without clicking "Save" (e.g. via the
+                // "Download another model..." button, which writes to the config immediately).
+                maybeAutoEnableFastMode();
             }
         });
 
         aiCheckbox = new Button(shell, SWT.CHECK);
-        aiCheckbox.setText("Gerar ata estruturada com IA (Claude)");
+        aiCheckbox.setText("Generate AI-structured minutes (Claude)");
         aiCheckbox.setSelection(config.getBoolean(AppConfig.KEY_AI_ENABLED, false));
-        GridData aiCheckboxData = new GridData(SWT.FILL, SWT.CENTER, true, false, 3, 1);
-        aiCheckbox.setLayoutData(aiCheckboxData);
+        aiCheckbox.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
         aiCheckbox.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
@@ -149,20 +144,43 @@ public final class MainWindow {
         });
 
         diarizationCheckbox = new Button(shell, SWT.CHECK);
-        diarizationCheckbox.setText("Identificar participantes na transcrição (experimental)");
+        diarizationCheckbox.setText("Identify participants in the transcription (experimental)");
         diarizationCheckbox.setSelection(config.getBoolean(AppConfig.KEY_DIARIZATION_ENABLED, false));
-        GridData diarizationCheckboxData = new GridData(SWT.FILL, SWT.CENTER, true, false, 3, 1);
-        diarizationCheckbox.setLayoutData(diarizationCheckboxData);
+        diarizationCheckbox.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
         diarizationCheckbox.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
                 config.setBoolean(AppConfig.KEY_DIARIZATION_ENABLED, diarizationCheckbox.getSelection());
                 config.save();
+                refreshDiarizationSectionStatus();
             }
         });
 
-        transcribeButton = new Button(shell, SWT.PUSH);
-        transcribeButton.setText("Transcrever");
+        fastModeCheckbox = new Button(shell, SWT.CHECK);
+        fastModeCheckbox.setText("Prioritize speed and GPU memory usage (less accurate)");
+        fastModeCheckbox.setToolTipText(
+                "Uses greedy decoding (beam-size 1) instead of whisper.cpp's default (beam-size 5). "
+                        + "Faster and uses noticeably less GPU memory — helps avoid \"out of memory\" errors "
+                        + "on GPUs with little VRAM, at the cost of a slightly less accurate transcription.");
+        fastModeCheckbox.setSelection(config.getBoolean(AppConfig.KEY_WHISPER_FAST_MODE, false));
+        fastModeCheckbox.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        fastModeCheckbox.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                config.setBoolean(AppConfig.KEY_WHISPER_FAST_MODE, fastModeCheckbox.getSelection());
+                config.save();
+            }
+        });
+
+        Composite actionsRow = new Composite(shell, SWT.NONE);
+        GridLayout actionsLayout = new GridLayout(2, false);
+        actionsLayout.marginWidth = 0;
+        actionsLayout.marginHeight = 0;
+        actionsRow.setLayout(actionsLayout);
+        actionsRow.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+
+        transcribeButton = new Button(actionsRow, SWT.PUSH);
+        transcribeButton.setText("Transcribe");
         transcribeButton.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
@@ -170,8 +188,8 @@ public final class MainWindow {
             }
         });
 
-        cancelButton = new Button(shell, SWT.PUSH);
-        cancelButton.setText("Cancelar");
+        cancelButton = new Button(actionsRow, SWT.PUSH);
+        cancelButton.setText("Cancel");
         cancelButton.setEnabled(false);
         cancelButton.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -180,36 +198,143 @@ public final class MainWindow {
             }
         });
 
-        progressBar = new ProgressBar(shell, SWT.SMOOTH);
-        progressBar.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        buildPhaseSections();
+        refreshDiarizationSectionStatus();
+    }
 
-        Composite logsComposite = new Composite(shell, SWT.NONE);
-        GridLayout logsLayout = new GridLayout(2, true);
-        logsLayout.marginWidth = 0;
-        logsLayout.marginHeight = 0;
-        logsComposite.setLayout(logsLayout);
-        logsComposite.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 3, 1));
+    private void buildFileListSection() {
+        Label filesLabel = new Label(shell, SWT.NONE);
+        filesLabel.setText("Video files (in the order they will be concatenated):");
 
-        Composite mainLogColumn = new Composite(logsComposite, SWT.NONE);
-        mainLogColumn.setLayout(new GridLayout(1, false));
-        mainLogColumn.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
-        Label mainLogLabel = new Label(mainLogColumn, SWT.NONE);
-        mainLogLabel.setText("Transcrição");
-        logText = new Text(mainLogColumn, SWT.MULTI | SWT.BORDER | SWT.V_SCROLL | SWT.WRAP | SWT.READ_ONLY);
-        GridData logData = new GridData(SWT.FILL, SWT.FILL, true, true);
-        logData.heightHint = 220;
-        logText.setLayoutData(logData);
+        Composite filesRow = new Composite(shell, SWT.NONE);
+        GridLayout filesRowLayout = new GridLayout(2, false);
+        filesRowLayout.marginWidth = 0;
+        filesRowLayout.marginHeight = 0;
+        filesRow.setLayout(filesRowLayout);
+        filesRow.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
-        Composite diarizationLogColumn = new Composite(logsComposite, SWT.NONE);
-        diarizationLogColumn.setLayout(new GridLayout(1, false));
-        diarizationLogColumn.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
-        Label diarizationLogLabel = new Label(diarizationLogColumn, SWT.NONE);
-        diarizationLogLabel.setText("Identificação de participantes");
-        diarizationLogText = new Text(diarizationLogColumn,
-                SWT.MULTI | SWT.BORDER | SWT.V_SCROLL | SWT.WRAP | SWT.READ_ONLY);
-        GridData diarizationLogData = new GridData(SWT.FILL, SWT.FILL, true, true);
-        diarizationLogData.heightHint = 220;
-        diarizationLogText.setLayoutData(diarizationLogData);
+        fileListWidget = new org.eclipse.swt.widgets.List(filesRow, SWT.BORDER | SWT.V_SCROLL | SWT.SINGLE);
+        GridData listData = new GridData(SWT.FILL, SWT.FILL, true, false);
+        listData.heightHint = 120;
+        fileListWidget.setLayoutData(listData);
+        fileListWidget.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                refreshFileListButtons();
+            }
+        });
+
+        Composite fileButtonsColumn = new Composite(filesRow, SWT.NONE);
+        GridLayout fileButtonsLayout = new GridLayout(1, false);
+        fileButtonsColumn.setLayout(fileButtonsLayout);
+        fileButtonsColumn.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false));
+
+        addButton = new Button(fileButtonsColumn, SWT.PUSH);
+        addButton.setText("Add...");
+        addButton.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        addButton.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                addVideoFiles();
+            }
+        });
+
+        removeFileButton = new Button(fileButtonsColumn, SWT.PUSH);
+        removeFileButton.setText("Remove");
+        removeFileButton.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        removeFileButton.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                removeSelectedVideoFile();
+            }
+        });
+
+        moveUpButton = new Button(fileButtonsColumn, SWT.PUSH);
+        moveUpButton.setText("▲");
+        moveUpButton.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        moveUpButton.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                moveSelectedVideoFile(-1);
+            }
+        });
+
+        moveDownButton = new Button(fileButtonsColumn, SWT.PUSH);
+        moveDownButton.setText("▼");
+        moveDownButton.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        moveDownButton.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                moveSelectedVideoFile(1);
+            }
+        });
+
+        totalsLabel = new Label(shell, SWT.NONE);
+        totalsLabel.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+
+        Composite outputDirRow = new Composite(shell, SWT.NONE);
+        GridLayout outputDirLayout = new GridLayout(2, false);
+        outputDirLayout.marginWidth = 0;
+        outputDirLayout.marginHeight = 0;
+        outputDirRow.setLayout(outputDirLayout);
+        outputDirRow.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+
+        outputDirLabel = new Label(outputDirRow, SWT.NONE);
+        outputDirLabel.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+
+        outputDirButton = new Button(outputDirRow, SWT.PUSH);
+        outputDirButton.setText("Choose destination folder...");
+        outputDirButton.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                chooseOutputDir();
+            }
+        });
+
+        refreshFileListButtons();
+        refreshTotalsLabel();
+        refreshOutputDirLabel();
+    }
+
+    private void chooseOutputDir() {
+        DirectoryDialog dialog = new DirectoryDialog(shell);
+        dialog.setText("Choose minutes destination folder");
+        String currentOutputDir = config.get(AppConfig.KEY_OUTPUT_DIR, "");
+        dialog.setFilterPath(!currentOutputDir.isBlank() ? currentOutputDir : config.get(AppConfig.KEY_LAST_VIDEO_DIR, ""));
+        String chosen = dialog.open();
+        if (chosen != null) {
+            config.set(AppConfig.KEY_OUTPUT_DIR, chosen);
+            config.save();
+            refreshOutputDirLabel();
+        }
+    }
+
+    private void refreshOutputDirLabel() {
+        String configured = config.get(AppConfig.KEY_OUTPUT_DIR, "");
+        outputDirLabel.setText(configured.isBlank()
+                ? "Minutes destination folder: same folder as the first video"
+                : "Minutes destination folder: " + configured);
+    }
+
+    private void buildPhaseSections() {
+        audioSection = new CollapsibleSection(shell, "Audio extraction", false, this::adjustShellHeightToContent);
+        transcriptionSection = new CollapsibleSection(shell, "Transcription", false, this::adjustShellHeightToContent);
+        diarizationSection = new CollapsibleSection(shell, "Speaker identification", false,
+                this::adjustShellHeightToContent);
+        minutesSection = new CollapsibleSection(shell, "Minutes generation", false, this::adjustShellHeightToContent);
+    }
+
+    /**
+     * Grows/shrinks the window's height to fit its content whenever a phase section is
+     * expanded or collapsed, keeping the current width and top-left position untouched.
+     */
+    private void adjustShellHeightToContent() {
+        if (shell.isDisposed()) {
+            return;
+        }
+        org.eclipse.swt.graphics.Point currentSize = shell.getSize();
+        int preferredHeight = shell.computeSize(currentSize.x, SWT.DEFAULT).y;
+        shell.setSize(currentSize.x, preferredHeight);
     }
 
     private void buildMenu() {
@@ -217,12 +342,12 @@ public final class MainWindow {
         shell.setMenuBar(menuBar);
 
         MenuItem helpMenuHeader = new MenuItem(menuBar, SWT.CASCADE);
-        helpMenuHeader.setText("Ajuda");
+        helpMenuHeader.setText("Help");
         Menu helpMenu = new Menu(shell, SWT.DROP_DOWN);
         helpMenuHeader.setMenu(helpMenu);
 
         MenuItem checkInstall = new MenuItem(helpMenu, SWT.PUSH);
-        checkInstall.setText("Verificar instalação");
+        checkInstall.setText("Check installation");
         checkInstall.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
@@ -231,18 +356,145 @@ public final class MainWindow {
         });
     }
 
-    private void chooseVideo() {
-        FileDialog fileDialog = new FileDialog(shell, SWT.OPEN);
+    private void addVideoFiles() {
+        FileDialog fileDialog = new FileDialog(shell, SWT.OPEN | SWT.MULTI);
         fileDialog.setFilterExtensions(new String[] { "*.wmv;*.mp4;*.mkv;*.avi" });
         fileDialog.setFilterPath(config.get(AppConfig.KEY_LAST_VIDEO_DIR, ""));
         String chosen = fileDialog.open();
-        if (chosen != null) {
-            selectedVideo = Path.of(chosen);
-            videoFileLabel.setText(selectedVideo.getFileName().toString());
-            config.set(AppConfig.KEY_LAST_VIDEO_DIR, selectedVideo.getParent().toString());
-            config.save();
-            refreshDependencyState();
+        if (chosen == null) {
+            return;
         }
+        Path directory = Path.of(fileDialog.getFilterPath());
+        List<Path> newVideos = new ArrayList<>();
+        for (String fileName : fileDialog.getFileNames()) {
+            Path video = directory.resolve(fileName);
+            if (selectedVideos.stream().noneMatch(v -> v.path().equals(video))) {
+                long sizeBytes;
+                try {
+                    sizeBytes = Files.size(video);
+                } catch (java.io.IOException e) {
+                    sizeBytes = 0;
+                }
+                selectedVideos.add(new VideoFileInfo(video, sizeBytes, null));
+                newVideos.add(video);
+            }
+        }
+        config.set(AppConfig.KEY_LAST_VIDEO_DIR, directory.toString());
+        config.save();
+        refreshFileListWidget(selectedVideos.size() - 1);
+        refreshDependencyState();
+        probeDurationsAsync(newVideos);
+    }
+
+    /**
+     * Reads each new file's duration via ffprobe on a background thread (metadata-only, but still
+     * I/O, so it must not run on the UI thread) and updates the list once each result arrives.
+     */
+    private void probeDurationsAsync(List<Path> videos) {
+        String ffprobeExecutable = VideoProbe.resolveFfprobeExecutable(resolveFfmpegExecutable());
+        for (Path video : videos) {
+            Thread.ofVirtual().start(() -> {
+                Optional<Duration> duration = VideoProbe.probeDuration(ffprobeExecutable, video);
+                display.asyncExec(() -> {
+                    if (shell.isDisposed()) {
+                        return;
+                    }
+                    int index = indexOfVideo(video);
+                    if (index < 0) {
+                        return;
+                    }
+                    selectedVideos.set(index, selectedVideos.get(index).withDuration(duration.orElse(Duration.ZERO)));
+                    int selection = fileListWidget.getSelectionIndex();
+                    refreshFileListWidget(selection);
+                });
+            });
+        }
+    }
+
+    private int indexOfVideo(Path video) {
+        for (int i = 0; i < selectedVideos.size(); i++) {
+            if (selectedVideos.get(i).path().equals(video)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private void removeSelectedVideoFile() {
+        int index = fileListWidget.getSelectionIndex();
+        if (index < 0) {
+            return;
+        }
+        selectedVideos.remove(index);
+        refreshFileListWidget(Math.min(index, selectedVideos.size() - 1));
+        refreshDependencyState();
+    }
+
+    private void moveSelectedVideoFile(int offset) {
+        int index = fileListWidget.getSelectionIndex();
+        int newIndex = index + offset;
+        if (index < 0 || newIndex < 0 || newIndex >= selectedVideos.size()) {
+            return;
+        }
+        VideoFileInfo moved = selectedVideos.remove(index);
+        selectedVideos.add(newIndex, moved);
+        refreshFileListWidget(newIndex);
+    }
+
+    private void refreshFileListWidget(int selectIndex) {
+        String[] items = new String[selectedVideos.size()];
+        for (int i = 0; i < items.length; i++) {
+            VideoFileInfo info = selectedVideos.get(i);
+            String durationText = info.duration() == null ? "calculating..." : formatDuration(info.duration());
+            items[i] = "%d - %s (%s, %s)".formatted(i + 1, info.path().getFileName(),
+                    formatSize(info.sizeBytes()), durationText);
+        }
+        fileListWidget.setItems(items);
+        if (selectIndex >= 0 && selectIndex < items.length) {
+            fileListWidget.select(selectIndex);
+        }
+        refreshFileListButtons();
+        refreshTotalsLabel();
+    }
+
+    private void refreshTotalsLabel() {
+        if (totalsLabel == null) {
+            return;
+        }
+        long totalBytes = selectedVideos.stream().mapToLong(VideoFileInfo::sizeBytes).sum();
+        Duration totalDuration = selectedVideos.stream()
+                .map(v -> v.duration() == null ? Duration.ZERO : v.duration())
+                .reduce(Duration.ZERO, Duration::plus);
+        boolean pending = selectedVideos.stream().anyMatch(v -> v.duration() == null);
+        String durationText = formatDuration(totalDuration) + (pending ? " (calculating...)" : "");
+        totalsLabel.setText("Total: %s, %s".formatted(formatSize(totalBytes), durationText));
+    }
+
+    private static String formatSize(long bytes) {
+        double kb = bytes / 1024.0;
+        if (kb < 1024) {
+            return String.format(Locale.US, "%.0f KB", kb);
+        }
+        double mb = kb / 1024.0;
+        if (mb < 1024) {
+            return String.format(Locale.US, "%.1f MB", mb);
+        }
+        return String.format(Locale.US, "%.2f GB", mb / 1024.0);
+    }
+
+    private static String formatDuration(Duration duration) {
+        long totalSeconds = duration.toSeconds();
+        long hours = totalSeconds / 3600;
+        long minutes = (totalSeconds % 3600) / 60;
+        long seconds = totalSeconds % 60;
+        return hours > 0 ? "%d:%02d:%02d".formatted(hours, minutes, seconds) : "%02d:%02d".formatted(minutes, seconds);
+    }
+
+    private void refreshFileListButtons() {
+        int index = fileListWidget.getSelectionIndex();
+        removeFileButton.setEnabled(index >= 0);
+        moveUpButton.setEnabled(index > 0);
+        moveDownButton.setEnabled(index >= 0 && index < selectedVideos.size() - 1);
     }
 
     private void refreshDependencyState() {
@@ -250,13 +502,13 @@ public final class MainWindow {
         Thread.ofVirtual().start(() -> {
             DependencyChecker checker = new DependencyChecker(config);
             List<DependencyStatus> statuses = checker.checkAll();
-            // Dependências opcionais (ex.: diarização) não bloqueiam a transcrição.
+            // Optional dependencies (e.g. diarization) do not block transcription.
             boolean allOk = statuses.stream().filter(s -> !s.optional()).allMatch(DependencyStatus::ok);
             display.asyncExec(() -> {
                 if (!shell.isDisposed()) {
-                    transcribeButton.setEnabled(allOk && selectedVideo != null);
+                    transcribeButton.setEnabled(allOk && !selectedVideos.isEmpty());
                     transcribeButton.setToolTipText(allOk ? null
-                            : "Dependências ausentes. Veja Ajuda → Verificar instalação.");
+                            : "Missing dependencies. See Help → Check installation.");
                 }
             });
         });
@@ -275,8 +527,8 @@ public final class MainWindow {
                 if (!available) {
                     aiCheckbox.setSelection(false);
                     aiCheckbox.setToolTipText(!apiKeyPresent
-                            ? "Configure a chave da API da Anthropic nas Preferências para habilitar este recurso."
-                            : "É necessário confirmar o consentimento de privacidade nas Preferências.");
+                            ? "Configure the Anthropic API key in Preferences to enable this feature."
+                            : "You must confirm the privacy consent in Preferences.");
                 } else {
                     aiCheckbox.setToolTipText(null);
                 }
@@ -286,12 +538,68 @@ public final class MainWindow {
     }
 
     private void refreshDiarizationAvailability() {
-        // Os modelos de identificação de participantes vêm embutidos no jar (ONNX), então o
-        // recurso está sempre disponível — sem dependência externa nem configuração adicional.
+        // The speaker identification models are bundled in the jar (ONNX), so the feature is
+        // always available — no external dependency or additional configuration needed.
         diarizationCheckbox.setEnabled(true);
         diarizationCheckbox.setToolTipText(
-                "Recurso experimental: identifica os participantes usando modelos de IA locais "
-                        + "(sem enviar áudio pela internet). A precisão pode variar conforme a gravação.");
+                "Experimental feature: identifies participants using local AI models "
+                        + "(without sending audio over the internet). Accuracy may vary depending on the recording.");
+    }
+
+    private void refreshDiarizationSectionStatus() {
+        if (diarizationSection != null) {
+            diarizationSection.setStatus(diarizationCheckbox.getSelection() ? "" : "Disabled");
+        }
+    }
+
+    /**
+     * If the configured Whisper model would occupy most of the GPU's VRAM by itself, the fast
+     * mode (greedy decoding) checkbox is turned on automatically — this is exactly the scenario
+     * that causes CUDA out-of-memory failures partway through a transcription, and beam search
+     * (the whisper.cpp default) uses noticeably more VRAM than greedy decoding.
+     */
+    private void maybeAutoEnableFastMode() {
+        Thread.ofVirtual().start(() -> {
+            String configuredModel = config.get(AppConfig.KEY_WHISPER_MODEL, "");
+            if (configuredModel.isBlank()) {
+                return;
+            }
+            Path modelPath = Path.of(configuredModel);
+            if (!Files.isRegularFile(modelPath)) {
+                return;
+            }
+            long modelBytes;
+            try {
+                modelBytes = Files.size(modelPath);
+            } catch (java.io.IOException e) {
+                return;
+            }
+
+            GpuDetector gpuDetector = new GpuDetector(new ExecutableLocator.Default());
+            if (!gpuDetector.hasNvidiaGpu()) {
+                return;
+            }
+            Optional<Long> vramMb = gpuDetector.vramMb();
+            if (vramMb.isEmpty() || vramMb.get() <= 0) {
+                return;
+            }
+
+            double modelMb = modelBytes / (1024.0 * 1024.0);
+            boolean modelNearlyFillsVram = modelMb >= vramMb.get() * FAST_MODE_VRAM_THRESHOLD;
+
+            display.asyncExec(() -> {
+                if (shell.isDisposed() || fastModeCheckbox.isDisposed()) {
+                    return;
+                }
+                if (modelNearlyFillsVram && !fastModeCheckbox.getSelection()) {
+                    fastModeCheckbox.setSelection(true);
+                    config.setBoolean(AppConfig.KEY_WHISPER_FAST_MODE, true);
+                    config.save();
+                    LOG.info("Configured Whisper model ({} MB) occupies most of the detected VRAM "
+                            + "({} MB); fast mode enabled automatically.", Math.round(modelMb), vramMb.get());
+                }
+            });
+        });
     }
 
     private void showDependencyDialog() {
@@ -307,25 +615,32 @@ public final class MainWindow {
     }
 
     private void startTranscription() {
-        if (selectedVideo == null) {
+        if (selectedVideos.isEmpty()) {
             return;
         }
-        transcribeButton.setEnabled(false);
-        cancelButton.setEnabled(true);
-        logText.setText("");
-        diarizationLogText.setText("");
-        progressBar.setSelection(0);
+
+        // Reads the widget state here, on the UI thread and before locking down the controls
+        // (which disables these same checkboxes) — the background thread must not touch SWT
+        // widgets (it would throw SWTException: Invalid thread access), and reading after
+        // disabling would always yield "false".
+        boolean aiEnabled = aiCheckbox.getEnabled() && aiCheckbox.getSelection();
+        boolean diarizationEnabled = diarizationCheckbox.getEnabled() && diarizationCheckbox.getSelection();
+        List<Path> videos = selectedVideos.stream().map(VideoFileInfo::path).toList();
+
+        setControlsEnabledWhileBusy(true);
+        audioSection.clear();
+        transcriptionSection.clear();
+        diarizationSection.clear();
+        minutesSection.clear();
+        audioSection.setStatus("");
+        transcriptionSection.setStatus("");
+        minutesSection.setStatus("");
+        diarizationSection.setStatus(diarizationEnabled ? "" : "Disabled");
 
         ProcessRunner.Handle handle = new ProcessRunner.Handle();
         currentHandle = handle;
 
-        // Lê o estado dos widgets aqui, na UI thread — a thread de fundo não pode tocar em
-        // widgets SWT (dispararia SWTException: Invalid thread access).
-        boolean useVosk = engineCombo.getSelectionIndex() == 1;
-        boolean aiEnabled = aiCheckbox.getEnabled() && aiCheckbox.getSelection();
-        boolean diarizationEnabled = diarizationCheckbox.getEnabled() && diarizationCheckbox.getSelection();
-
-        Thread.ofVirtual().start(() -> runPipeline(handle, useVosk, aiEnabled, diarizationEnabled));
+        Thread.ofVirtual().start(() -> runPipeline(handle, videos, aiEnabled, diarizationEnabled));
     }
 
     private void cancelTranscription() {
@@ -333,66 +648,110 @@ public final class MainWindow {
         if (handle != null) {
             handle.cancel();
         }
-        appendLog("Cancelando...");
+        display.asyncExec(() -> {
+            if (shell.isDisposed()) {
+                return;
+            }
+            audioSection.appendLog("Cancelling...");
+            audioSection.setStatusIfInProgress("Cancelled");
+            transcriptionSection.setStatusIfInProgress("Cancelled");
+            diarizationSection.setStatusIfInProgress("Cancelled");
+            minutesSection.setStatusIfInProgress("Cancelled");
+        });
     }
 
-    private void runPipeline(ProcessRunner.Handle handle, boolean useVosk, boolean aiEnabled,
+    /**
+     * While a transcription runs, every control except the collapsible sections' expand/collapse
+     * toggle is locked down (only "Cancel" remains usable) so the user can't change files or
+     * settings mid-run. When it ends (success, cancellation, or failure), controls go back to
+     * their normal state — re-derived via {@link #refreshDependencyState()}/{@link
+     * #refreshAiAvailability()} rather than blindly re-enabled, since their availability depends
+     * on external conditions (dependencies present, AI opted in, etc.).
+     */
+    private void setControlsEnabledWhileBusy(boolean busy) {
+        fileListWidget.setEnabled(!busy);
+        addButton.setEnabled(!busy);
+        outputDirButton.setEnabled(!busy);
+        preferencesButton.setEnabled(!busy);
+        diarizationCheckbox.setEnabled(!busy);
+        fastModeCheckbox.setEnabled(!busy);
+        cancelButton.setEnabled(busy);
+        if (busy) {
+            fileListWidget.deselectAll();
+            aiCheckbox.setEnabled(false);
+            transcribeButton.setEnabled(false);
+            removeFileButton.setEnabled(false);
+            moveUpButton.setEnabled(false);
+            moveDownButton.setEnabled(false);
+        } else {
+            refreshFileListButtons();
+            refreshDependencyState();
+            refreshAiAvailability();
+        }
+    }
+
+    private void runPipeline(ProcessRunner.Handle handle, List<Path> videos, boolean aiEnabled,
             boolean diarizationEnabled) {
         try {
-            TranscriptionPipeline pipeline = buildPipeline(useVosk, aiEnabled, diarizationEnabled);
-            Path outputDir = selectedVideo.getParent();
-            // percent == -1 é o sentinel usado pelos motores/ffmpeg para "apenas uma linha de
-            // log" (saída bruta do processo, frases transcritas conforme reconhecidas etc.),
-            // sem que isso deva mover a barra de progresso.
-            PipelineResult result = pipeline.run(selectedVideo, outputDir,
-                    (message, percent) -> display.asyncExec(() -> {
-                        if (shell.isDisposed()) {
-                            return;
-                        }
-                        if (percent < 0) {
-                            appendLog(message);
-                        } else {
-                            appendLog(message + " (" + percent + "%)");
-                            progressBar.setSelection(percent);
-                        }
-                    }),
-                    (message, percent) -> display.asyncExec(() -> {
-                        if (!shell.isDisposed()) {
-                            appendDiarizationLog(message);
-                        }
-                    }),
+            TranscriptionPipeline pipeline = buildPipeline(aiEnabled, diarizationEnabled);
+            Path outputDir = resolveOutputDir(videos);
+            // percent == -1 is the sentinel used by the engines/ffmpeg for "just a log line"
+            // (raw process output, transcribed sentences as they are recognized, etc.), which
+            // should not move the phase's progress indicator.
+            PipelineResult result = pipeline.run(videos, outputDir,
+                    (message, percent) -> display.asyncExec(() -> reportPhaseProgress(audioSection, message, percent)),
+                    (message, percent) -> display
+                            .asyncExec(() -> reportPhaseProgress(transcriptionSection, message, percent)),
+                    (message, percent) -> display
+                            .asyncExec(() -> reportPhaseProgress(diarizationSection, message, percent)),
+                    (message, percent) -> display
+                            .asyncExec(() -> reportPhaseProgress(minutesSection, message, percent)),
                     handle);
 
             display.asyncExec(() -> {
                 if (shell.isDisposed()) {
                     return;
                 }
-                transcribeButton.setEnabled(true);
-                cancelButton.setEnabled(false);
+                setControlsEnabledWhileBusy(false);
                 SuccessDialog.show(shell, result.simpleMinutesPath(), result.structuredMinutesPath(),
                         result.aiWarning());
             });
         } catch (ProcessCancelledException e) {
-            LOG.info("Transcrição cancelada pelo usuário");
+            LOG.info("Transcription cancelled by the user");
             display.asyncExec(() -> {
                 if (shell.isDisposed()) {
                     return;
                 }
-                appendLog("Transcrição cancelada.");
-                transcribeButton.setEnabled(true);
-                cancelButton.setEnabled(false);
-                progressBar.setSelection(0);
+                audioSection.appendLog("Transcription cancelled.");
+                setControlsEnabledWhileBusy(false);
             });
         } catch (ExternalProcessException e) {
-            LOG.error("Falha em processo externo durante a transcrição", e);
+            LOG.error("External process failure during transcription", e);
             display.asyncExec(() -> onPipelineFailed(
-                    "Ocorreu um problema ao executar uma ferramenta externa (ffmpeg ou whisper-cli). "
+                    "A problem occurred while running an external tool (ffmpeg or whisper-cli). "
                             + e.getMessage(),
                     e.getProcessOutput()));
         } catch (Exception e) {
-            LOG.error("Falha inesperada durante a transcrição", e);
+            LOG.error("Unexpected failure during transcription", e);
             display.asyncExec(() -> onPipelineFailed(
-                    "Ocorreu um problema inesperado durante a transcrição: " + e.getMessage(), ""));
+                    "An unexpected problem occurred during transcription: " + e.getMessage(), ""));
+        }
+    }
+
+    private void reportPhaseProgress(CollapsibleSection section, String message, int percent) {
+        if (shell.isDisposed()) {
+            return;
+        }
+        if (percent < 0) {
+            section.appendLog(message);
+            section.setStatusIfWaiting("In progress...");
+        } else {
+            section.appendLog(message + " (" + percent + "%)");
+            if (percent >= 100) {
+                section.setStatus(message.startsWith("Could not") ? "Failed ⚠" : "Completed ✓");
+            } else {
+                section.setStatus("In progress (" + percent + "%)");
+            }
         }
     }
 
@@ -400,19 +759,15 @@ public final class MainWindow {
         if (shell.isDisposed()) {
             return;
         }
-        transcribeButton.setEnabled(true);
-        cancelButton.setEnabled(false);
+        setControlsEnabledWhileBusy(false);
         ErrorDialog.show(shell, friendlyMessage, details);
     }
 
-    private TranscriptionPipeline buildPipeline(boolean useVosk, boolean aiEnabled, boolean diarizationEnabled)
-            throws Exception {
+    private TranscriptionPipeline buildPipeline(boolean aiEnabled, boolean diarizationEnabled) throws Exception {
         long timeout = config.getInt(AppConfig.KEY_PROCESS_TIMEOUT_SECONDS, (int) DEFAULT_TIMEOUT_SECONDS);
         AudioExtractor audioExtractor = new AudioExtractor(resolveFfmpegExecutable(), timeout);
 
-        TranscriptionEngine engine = useVosk
-                ? new VoskEngine(Path.of(config.get(AppConfig.KEY_VOSK_MODEL_DIR, "")))
-                : buildWhisperEngine(timeout);
+        TranscriptionEngine engine = buildWhisperEngine(timeout);
 
         DocxMinutesGenerator generator = new DocxMinutesGenerator(config.get(AppConfig.KEY_COMPANY_NAME, ""));
 
@@ -428,15 +783,27 @@ public final class MainWindow {
 
         SpeakerDiarizer diarizer = diarizationEnabled ? new OnnxSpeakerDiarizer() : null;
 
-        boolean chunkingEnabled = config.getBoolean(AppConfig.KEY_CHUNK_ENABLED, false);
-        int chunkMinutes = config.getInt(AppConfig.KEY_CHUNK_MINUTES, 20);
-
         return new TranscriptionPipeline(audioExtractor, engine, generator, structurer, diarizer,
-                chunkingEnabled, chunkMinutes, aiEnabled, diarizationEnabled);
+                aiEnabled, diarizationEnabled);
     }
 
     private String resolveFfmpegExecutable() {
         return config.get(AppConfig.KEY_FFMPEG_BINARY, "ffmpeg");
+    }
+
+    /**
+     * The configured destination folder, if the user chose one and it still exists; otherwise
+     * falls back to the first video's folder (the original, implicit behavior).
+     */
+    private Path resolveOutputDir(List<Path> videos) {
+        String configured = config.get(AppConfig.KEY_OUTPUT_DIR, "");
+        if (!configured.isBlank()) {
+            Path dir = Path.of(configured);
+            if (Files.isDirectory(dir)) {
+                return dir;
+            }
+        }
+        return videos.get(0).getParent();
     }
 
     /**
@@ -460,13 +827,5 @@ public final class MainWindow {
         TranscriptionEngine cpuFallback = new WhisperCppEngine(cpuBinary.toString(), modelPath, "pt", timeout,
                 fastMode);
         return new CudaFallbackTranscriptionEngine(primary, cpuFallback);
-    }
-
-    private void appendLog(String message) {
-        logText.append(message + System.lineSeparator());
-    }
-
-    private void appendDiarizationLog(String message) {
-        diarizationLogText.append(message + System.lineSeparator());
     }
 }
