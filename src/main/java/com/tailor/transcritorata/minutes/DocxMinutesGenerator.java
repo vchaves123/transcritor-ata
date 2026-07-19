@@ -2,8 +2,10 @@ package com.tailor.transcritorata.minutes;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -185,10 +187,27 @@ public final class DocxMinutesGenerator {
         }
     }
 
+    /**
+     * Writes to a sibling temp file first, then atomically renames it over the final path once
+     * the document is fully serialized — so a crash, forced kill, or disk-full error mid-write can
+     * never leave a truncated/corrupt file at {@code outputPath}, e.g. destroying a previously
+     * generated minutes document when the user reprocesses the same recording.
+     */
     private void write(XWPFDocument document, Path outputPath) throws IOException {
-        Files.createDirectories(outputPath.toAbsolutePath().getParent());
-        try (OutputStream out = Files.newOutputStream(outputPath)) {
+        Path absoluteOutputPath = outputPath.toAbsolutePath();
+        Files.createDirectories(absoluteOutputPath.getParent());
+        Path tempFile = absoluteOutputPath.resolveSibling(absoluteOutputPath.getFileName() + ".tmp");
+        try (OutputStream out = Files.newOutputStream(tempFile)) {
             document.write(out);
+        }
+        try {
+            Files.move(tempFile, absoluteOutputPath, StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE);
+        } catch (FileSystemException e) {
+            // Some filesystems (e.g. across drives) don't support ATOMIC_MOVE; a plain replace is
+            // still far better than the original truncate-in-place, since it's a single rename
+            // instead of a byte-by-byte overwrite.
+            Files.move(tempFile, absoluteOutputPath, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 }

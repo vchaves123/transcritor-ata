@@ -15,6 +15,13 @@ import javax.sound.sampled.UnsupportedAudioFileException;
  */
 public final class Waveform {
 
+    // Bounds how much audio speaker identification (an optional, in-process feature) will ever
+    // load fully into memory: at 16kHz mono PCM16 this is ~115 MB/hour, so 6 hours (~690 MB of raw
+    // samples, before the segmentation/embedding models' own working buffers) comfortably covers
+    // this app's stated use case (meeting recordings) while still bounding a pathologically long
+    // or corrupted input from driving memory usage without limit.
+    private static final long MAX_FRAMES = 16_000L * 60 * 60 * 6;
+
     private Waveform() {
     }
 
@@ -25,7 +32,16 @@ public final class Waveform {
                     || format.getSampleSizeInBits() != 16) {
                 throw new IOException("Esperado WAV 16kHz mono PCM16, encontrado: " + format);
             }
+            long frameLength = in.getFrameLength();
+            if (frameLength != javax.sound.sampled.AudioSystem.NOT_SPECIFIED && frameLength > MAX_FRAMES) {
+                throw new IOException("Recording too long for speaker identification (" + frameLength
+                        + " frames, limit " + MAX_FRAMES + "); skipping this optional feature.");
+            }
             byte[] bytes = in.readAllBytes();
+            if (bytes.length / 2L > MAX_FRAMES) {
+                throw new IOException("Recording too long for speaker identification; skipping this optional "
+                        + "feature.");
+            }
             boolean bigEndian = format.isBigEndian();
             int sampleCount = bytes.length / 2;
             float[] samples = new float[sampleCount];

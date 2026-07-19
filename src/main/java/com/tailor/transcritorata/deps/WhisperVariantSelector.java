@@ -28,15 +28,15 @@ public final class WhisperVariantSelector {
 
     public static void applyBestVariant(AppConfig config, GpuDetector gpuDetector, ExecutableLocator locator) {
         boolean hasGpu = gpuDetector.hasNvidiaGpu();
-        String chosen = hasGpu ? CUDA_BINARY : CPU_BINARY;
+        Path resolved = AppHome.resolve(hasGpu ? CUDA_BINARY : CPU_BINARY);
 
-        if (!locator.exists(Path.of(chosen))) {
-            LOG.debug("whisper-cli build not found at {}; keeping existing configuration.", chosen);
+        if (!locator.exists(resolved)) {
+            LOG.debug("whisper-cli build not found at {}; keeping existing configuration.", resolved);
             return;
         }
 
-        LOG.info("NVIDIA GPU {}; using whisper-cli at {}", hasGpu ? "detected" : "not detected", chosen);
-        config.set(AppConfig.KEY_WHISPER_BINARY, chosen);
+        LOG.info("NVIDIA GPU {}; using whisper-cli at {}", hasGpu ? "detected" : "not detected", resolved);
+        config.set(AppConfig.KEY_WHISPER_BINARY, resolved.toString());
         config.save();
     }
 }

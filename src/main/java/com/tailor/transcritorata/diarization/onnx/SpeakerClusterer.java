@@ -5,6 +5,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Two-stage clustering of segment embeddings into speaker labels, matching
  * {@code cluster_embeddings} in the reference pipeline: long (reliable) segments are clustered
@@ -13,6 +16,15 @@ import java.util.Map;
  * clustering to be reliable on their own.
  */
 final class SpeakerClusterer {
+
+    private static final Logger LOG = LoggerFactory.getLogger(SpeakerClusterer.class);
+
+    // AgglomerativeClustering.fitSingleLinkage is O(n^3) in the number of "long" segments; a very
+    // long recording with frequent turn-taking (or an adversarially crafted one) could otherwise
+    // drive n into the thousands and hang the app for an unbounded amount of time with no
+    // feedback. Above this cap, speaker identification degrades to the same single-speaker
+    // fallback already used when there aren't enough long segments to cluster at all.
+    private static final int MAX_SEGMENTS_TO_CLUSTER = 500;
 
     private SpeakerClusterer() {
     }
@@ -45,6 +57,11 @@ final class SpeakerClusterer {
         }
 
         if (longIndices.size() < 2) {
+            return new int[n]; // all zeros: single speaker fallback
+        }
+        if (longIndices.size() > MAX_SEGMENTS_TO_CLUSTER) {
+            LOG.warn("Too many segments ({}) for speaker clustering (limit {}); falling back to a single "
+                    + "speaker for this recording.", longIndices.size(), MAX_SEGMENTS_TO_CLUSTER);
             return new int[n]; // all zeros: single speaker fallback
         }
 

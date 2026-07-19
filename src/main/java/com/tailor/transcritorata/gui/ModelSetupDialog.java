@@ -16,6 +16,7 @@ import org.eclipse.swt.widgets.ProgressBar;
 import org.eclipse.swt.widgets.Shell;
 
 import com.tailor.transcritorata.config.AppConfig;
+import com.tailor.transcritorata.deps.AppHome;
 import com.tailor.transcritorata.deps.ExecutableLocator;
 import com.tailor.transcritorata.deps.WhisperModelDownloader;
 import com.tailor.transcritorata.deps.WhisperModelOption;
@@ -152,7 +153,7 @@ final class ModelSetupDialog {
             ProgressBar progressBar, Label statusLabel, Button downloadButton, Button closeButton,
             String closeButtonLabel, Button[] radios, AtomicBoolean cancelled, AtomicBoolean downloading) {
         try {
-            Path targetDir = Path.of(MODELS_DIR);
+            Path targetDir = AppHome.resolve(MODELS_DIR);
             new WhisperModelDownloader().download(chosen, targetDir,
                     (done, total) -> display.asyncExec(() -> {
                         if (dialog.isDisposed()) {
@@ -171,7 +172,7 @@ final class ModelSetupDialog {
                 if (dialog.isDisposed()) {
                     return;
                 }
-                config.set(AppConfig.KEY_WHISPER_MODEL, MODELS_DIR + "/" + chosen.fileName());
+                config.set(AppConfig.KEY_WHISPER_MODEL, targetDir.resolve(chosen.fileName()).toString());
                 config.save();
                 dialog.close();
             });

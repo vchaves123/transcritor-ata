@@ -25,4 +25,12 @@ class WhisperModelOptionTest {
             assertTrue(!option.description().isBlank());
         }
     }
+
+    @Test
+    void everyOptionHasAPinnedSha256Checksum() {
+        for (WhisperModelOption option : WhisperModelOption.values()) {
+            assertTrue(option.sha256() != null && option.sha256().matches("[0-9a-f]{64}"),
+                    option + " must have a 64-character lowercase hex SHA-256 pinned");
+        }
+    }
 }

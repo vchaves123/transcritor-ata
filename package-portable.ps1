@@ -70,6 +70,20 @@ Copy-Item $ToolsSrc $ToolsDest -Recurse
 $ModelsDir = Join-Path $ToolsDest "models"
 if (Test-Path $ModelsDir) { Remove-Item $ModelsDir -Recurse -Force }
 
+# SHA-256 manifest of every bundled executable: lets the app notice (and warn about, not block on
+# -- this manifest ships inside the same zip, so it can't defend against the zip itself being
+# tampered with) local corruption or in-place modification of these binaries *after* extraction.
+$ChecksumsFile = Join-Path $ToolsDest "CHECKSUMS.sha256"
+$ChecksumLines = Get-ChildItem -Path $ToolsDest -Recurse -Filter "*.exe" | ForEach-Object {
+    $RelativePath = $_.FullName.Substring($ToolsDest.Length + 1).Replace('\', '/')
+    $Hash = (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLower()
+    "$Hash  $RelativePath"
+}
+# Hashes/paths are pure ASCII; written via .NET directly (instead of Set-Content -Encoding utf8)
+# to avoid Windows PowerShell 5.1's default UTF-8 BOM, which would otherwise corrupt the first
+# line when the app reads this manifest back.
+[System.IO.File]::WriteAllLines($ChecksumsFile, $ChecksumLines, (New-Object System.Text.UTF8Encoding $false))
+
 @"
 transcritor-ata $Version - portable version for Windows 11 (64-bit)
 

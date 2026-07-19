@@ -22,7 +22,8 @@ class BundledFfmpegSelectorTest {
 
         BundledFfmpegSelector.applyIfBundlePresent(config, locator);
 
-        assertEquals("tools/ffmpeg/bin/ffmpeg.exe", config.get(AppConfig.KEY_FFMPEG_BINARY, null));
+        assertEquals(AppHome.resolve("tools/ffmpeg/bin/ffmpeg.exe").toString(),
+                config.get(AppConfig.KEY_FFMPEG_BINARY, null));
     }
 
     @Test

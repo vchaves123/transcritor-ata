@@ -3,6 +3,8 @@ package com.tailor.transcritorata.transcription;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -35,6 +37,11 @@ public final class WhisperCppEngine implements TranscriptionEngine {
     // recent whisper.cpp builds don't always print an explicit "progress = N%" line.
     private static final Pattern SEGMENT_END_TIMESTAMP_PATTERN =
             Pattern.compile("-->\\s*(\\d{2}):(\\d{2}):(\\d{2})\\.(\\d{3})]");
+    // A degenerate/hallucinating whisper-cli run (see VadModelProvider) can in principle emit a
+    // huge number of near-duplicate segments; this bounds how large a -oj JSON file we'll ever
+    // fully load into memory, failing fast with a clear error instead of risking an OOM right at
+    // the end of a potentially hours-long transcription.
+    private static final long MAX_JSON_FILE_SIZE_BYTES = 500L * 1024 * 1024; // 500 MB
 
     private final String whisperCliExecutable;
     private final Path modelPath;
@@ -67,10 +74,16 @@ public final class WhisperCppEngine implements TranscriptionEngine {
 
         int threads = Runtime.getRuntime().availableProcessors();
         List<String> command = buildCommand(wav, outputPrefix, threads);
-        LOG.info("Transcribing {} with whisper.cpp (model {}, {} threads, fastMode={})",
-                wav, modelPath, threads, fastMode);
+        // Logs only file names, not full paths: the persistent log file (kept for 14 days under
+        // %APPDATA%) shouldn't durably retain the user's folder structure.
+        LOG.info("Transcribing with whisper.cpp (model {}, {} threads, fastMode={})",
+                modelPath.getFileName(), threads, fastMode);
 
         long totalDurationMillis = wavDurationMillis(wav);
+        // Recorded before the process starts, with a small tolerance for filesystem timestamp
+        // granularity/clock skew, so we can confirm the JSON file was actually (re)written by
+        // *this* invocation rather than being a leftover/planted file at a predictable path.
+        Instant invocationStart = Instant.now().minusSeconds(2);
         try {
             ProcessRunner.run(command, handle, timeoutSeconds, line -> reportProgress(line, listener, totalDurationMillis));
 
@@ -78,6 +91,19 @@ public final class WhisperCppEngine implements TranscriptionEngine {
             if (!Files.exists(jsonFile)) {
                 throw new ExternalProcessException(
                         "whisper.cpp did not generate the expected transcription file.", "");
+            }
+            FileTime lastModified = Files.getLastModifiedTime(jsonFile);
+            if (lastModified.toInstant().isBefore(invocationStart)) {
+                throw new ExternalProcessException(
+                        "The transcription file at " + jsonFile + " predates this whisper.cpp run; "
+                                + "refusing to trust it.", "");
+            }
+            long jsonSize = Files.size(jsonFile);
+            if (jsonSize > MAX_JSON_FILE_SIZE_BYTES) {
+                throw new ExternalProcessException(
+                        "whisper.cpp produced an unexpectedly large transcription file (" + jsonSize
+                                + " bytes) — this usually indicates whisper.cpp got stuck repeating itself on "
+                                + "this recording. Aborting instead of risking an out-of-memory crash.", "");
             }
             return parseJson(jsonFile);
         } finally {
@@ -114,6 +140,18 @@ public final class WhisperCppEngine implements TranscriptionEngine {
         if (listener == null || line.isBlank()) {
             return;
         }
+        // Defensive: this callback runs synchronously inside ProcessRunner's stdout-reading loop
+        // while whisper-cli is still alive. A garbled/oversized number in a malformed progress
+        // line (e.g. from a corrupted build) must not throw out of here uncaught -- that would
+        // skip ProcessRunner's own process cleanup and leave whisper-cli running unmanaged.
+        try {
+            reportProgressUnsafe(line, listener, totalDurationMillis);
+        } catch (NumberFormatException e) {
+            listener.onProgress(line.strip(), -1);
+        }
+    }
+
+    private void reportProgressUnsafe(String line, ProgressListener listener, long totalDurationMillis) {
         Matcher progressMatcher = PROGRESS_PATTERN.matcher(line);
         if (progressMatcher.find()) {
             listener.onProgress("Transcribing...", Integer.parseInt(progressMatcher.group(1)));
@@ -156,6 +194,14 @@ public final class WhisperCppEngine implements TranscriptionEngine {
         }
         for (WhisperJsonResult.WhisperTranscriptionEntry entry : result.transcription) {
             if (entry.offsets == null) {
+                continue;
+            }
+            // Guards against a degenerate/corrupted whisper-cli run emitting a negative or
+            // inverted offset pair, which would otherwise produce a malformed timestamp (e.g.
+            // "00:00:-5") silently embedded in the generated .docx minutes.
+            if (entry.offsets.from < 0 || entry.offsets.to < entry.offsets.from) {
+                LOG.warn("Skipping transcription entry with invalid offsets (from={}, to={})",
+                        entry.offsets.from, entry.offsets.to);
                 continue;
             }
             segments.add(new Segment(

@@ -3,8 +3,10 @@ package com.tailor.transcritorata.config;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Properties;
 
 import org.slf4j.Logger;
@@ -70,11 +72,22 @@ public final class AppConfig {
         properties.putIfAbsent(KEY_DIARIZATION_ENABLED, "false");
     }
 
+    /**
+     * Writes to a sibling temp file first, then atomically renames it over the live config file
+     * — a crash/forced-kill/disk-full during the write can otherwise leave a truncated or
+     * partially-written config.properties that silently reverts saved preferences on next load.
+     */
     public void save() {
         try {
             Files.createDirectories(configFile.getParent());
-            try (OutputStream out = Files.newOutputStream(configFile)) {
+            Path tempFile = configFile.resolveSibling(configFile.getFileName() + ".tmp");
+            try (OutputStream out = Files.newOutputStream(tempFile)) {
                 properties.store(out, "transcritor-ata configuration - auto-generated");
+            }
+            try {
+                Files.move(tempFile, configFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (FileSystemException e) {
+                Files.move(tempFile, configFile, StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (IOException e) {
             LOG.warn("Could not save config file {}: {}", configFile, e.getMessage());

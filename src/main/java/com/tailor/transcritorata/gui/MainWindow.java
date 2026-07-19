@@ -704,7 +704,21 @@ public final class MainWindow {
     }
 
     private String resolveFfmpegExecutable() {
-        return config.get(AppConfig.KEY_FFMPEG_BINARY, "ffmpeg");
+        return config.get(AppConfig.KEY_FFMPEG_BINARY, defaultExecutable("ffmpeg.exe"));
+    }
+
+    /**
+     * Resolves a bare executable name (used only when nothing is configured/bundled) to an
+     * absolute path found via an explicit PATH scan, instead of handing the bare name to
+     * {@link ProcessBuilder} — on Windows, a bare name is looked up in the current working
+     * directory before PATH, so a same-named file planted there would otherwise be preferred
+     * over the real, PATH-installed executable. Falls back to the bare name only if it can't be
+     * found anywhere, which fails the same way a bare invocation would have anyway.
+     */
+    private static String defaultExecutable(String executableName) {
+        return new ExecutableLocator.Default().findOnPathOrCandidates(executableName, List.of())
+                .map(Path::toString)
+                .orElse(executableName.replace(".exe", ""));
     }
 
     /**
@@ -729,11 +743,11 @@ public final class MainWindow {
      * fine, and restarting on CPU is far friendlier than surfacing a raw CUDA error.
      */
     private TranscriptionEngine buildWhisperEngine(long timeout) {
-        Path cudaBinaryPath = Path.of("tools", "whisper-cuda", "Release", "whisper-cli.exe");
-        Path cpuBinaryPath = Path.of("tools", "whisper-cpu", "Release", "whisper-cli.exe");
+        Path cudaBinaryPath = com.tailor.transcritorata.deps.AppHome.resolve("tools/whisper-cuda/Release/whisper-cli.exe");
+        Path cpuBinaryPath = com.tailor.transcritorata.deps.AppHome.resolve("tools/whisper-cpu/Release/whisper-cli.exe");
         String cudaBinary = Files.isRegularFile(cudaBinaryPath) ? cudaBinaryPath.toString() : null;
         String cpuBinary = Files.isRegularFile(cpuBinaryPath) ? cpuBinaryPath.toString()
-                : config.get(AppConfig.KEY_WHISPER_BINARY, "whisper-cli");
+                : config.get(AppConfig.KEY_WHISPER_BINARY, defaultExecutable("whisper-cli.exe"));
 
         Path configuredModelPath = Path.of(config.get(AppConfig.KEY_WHISPER_MODEL, ""));
         List<AdaptiveWhisperEngine.ModelCandidate> candidates = discoverModelCandidates(configuredModelPath);
@@ -754,7 +768,7 @@ public final class MainWindow {
     private static List<AdaptiveWhisperEngine.ModelCandidate> discoverModelCandidates(Path configuredModelPath) {
         Path modelsDir = configuredModelPath.getParent();
         if (modelsDir == null) {
-            modelsDir = Path.of("tools", "models");
+            modelsDir = com.tailor.transcritorata.deps.AppHome.resolve("tools/models");
         }
 
         List<AdaptiveWhisperEngine.ModelCandidate> candidates = new ArrayList<>();

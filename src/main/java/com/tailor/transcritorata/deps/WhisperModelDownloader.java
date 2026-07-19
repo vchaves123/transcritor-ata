@@ -10,6 +10,17 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
+import java.util.HexFormat;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
@@ -23,6 +34,12 @@ import org.slf4j.LoggerFactory;
 public final class WhisperModelDownloader {
 
     private static final Logger LOG = LoggerFactory.getLogger(WhisperModelDownloader.class);
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(15);
+    private static final Duration RESPONSE_HEADERS_TIMEOUT = Duration.ofSeconds(30);
+    // A MITM'd/misbehaving server could accept the connection and then simply never send (or
+    // trickle) body bytes; HttpRequest's own timeout only bounds waiting for response headers,
+    // not reading an ofInputStream() body afterwards, so each read is bounded individually.
+    private static final Duration READ_STALL_TIMEOUT = Duration.ofSeconds(30);
 
     @FunctionalInterface
     public interface ProgressListener {
@@ -44,22 +61,26 @@ public final class WhisperModelDownloader {
 
         HttpClient client = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
+                .connectTimeout(CONNECT_TIMEOUT)
                 .build();
-        HttpRequest request = HttpRequest.newBuilder(URI.create(option.downloadUrl())).GET().build();
+        HttpRequest request = HttpRequest.newBuilder(URI.create(option.downloadUrl()))
+                .timeout(RESPONSE_HEADERS_TIMEOUT)
+                .GET().build();
 
-        try {
+        try (ExecutorService readExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
             if (response.statusCode() != 200) {
                 throw new IOException("Failed to download the model (HTTP " + response.statusCode() + ").");
             }
             long total = response.headers().firstValueAsLong("Content-Length").orElse(-1);
 
-            try (InputStream in = response.body();
+            MessageDigest digest = sha256Digest();
+            try (InputStream in = new DigestInputStream(response.body(), digest);
                     OutputStream out = Files.newOutputStream(partial)) {
                 byte[] buffer = new byte[1 << 16];
                 long downloaded = 0;
                 int read;
-                while ((read = in.read(buffer)) != -1) {
+                while ((read = readWithTimeout(in, buffer, readExecutor)) != -1) {
                     if (cancelled.get()) {
                         throw new IOException("Download cancelled by the user.");
                     }
@@ -70,6 +91,15 @@ public final class WhisperModelDownloader {
                     }
                 }
             }
+
+            String actualSha256 = HexFormat.of().formatHex(digest.digest());
+            String expectedSha256 = option.sha256();
+            if (!actualSha256.equalsIgnoreCase(expectedSha256)) {
+                throw new IOException("Downloaded model failed checksum verification (expected " + expectedSha256
+                        + ", got " + actualSha256 + "). The file may have been corrupted or tampered with in "
+                        + "transit; it was not saved.");
+            }
+
             Files.move(partial, target, StandardCopyOption.REPLACE_EXISTING);
             return target;
         } catch (IOException e) {
@@ -79,6 +109,40 @@ public final class WhisperModelDownloader {
             Thread.currentThread().interrupt();
             Files.deleteIfExists(partial);
             throw new IOException("Download interrupted: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Reads one chunk from {@code in}, bounded by {@link #READ_STALL_TIMEOUT}: a connection that
+     * stays open but stops sending data would otherwise block this call (and the Cancel button
+     * with it) indefinitely.
+     */
+    private static int readWithTimeout(InputStream in, byte[] buffer, ExecutorService readExecutor)
+            throws IOException {
+        Future<Integer> future = readExecutor.submit(() -> in.read(buffer));
+        try {
+            return future.get(READ_STALL_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            throw new IOException(
+                    "Download stalled: no data received for " + READ_STALL_TIMEOUT.getSeconds() + "s.");
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof IOException io) {
+                throw io;
+            }
+            throw new IOException("Download failed: " + cause, cause);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Download interrupted.", e);
+        }
+    }
+
+    private static MessageDigest sha256Digest() {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is guaranteed to be available on every JDK", e);
         }
     }
 }

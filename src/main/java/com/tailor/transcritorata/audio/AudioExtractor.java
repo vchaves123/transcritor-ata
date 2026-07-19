@@ -43,7 +43,10 @@ public final class AudioExtractor {
                 "-c:a", "pcm_s16le",
                 outputWav.toString());
 
-        LOG.info("Extracting audio from {} to {}", input, outputWav);
+        // Logs only the file name, not the full path: the persistent log file (kept for 14 days
+        // under %APPDATA%) shouldn't durably retain the user's folder structure, which can itself
+        // be sensitive (e.g. an HR/restructuring-related folder name).
+        LOG.info("Extracting audio from {} to a temporary WAV", input.getFileName());
         ProcessRunner.run(command, handle, timeoutSeconds, forward(outputLineListener));
     }
 
@@ -62,8 +65,18 @@ public final class AudioExtractor {
         Path listFile = Files.createTempFile(outputWav.getParent(), "concat-list-", ".txt");
         StringBuilder listContents = new StringBuilder();
         for (Path wav : wavFiles) {
-            listContents.append("file '").append(wav.toAbsolutePath().toString().replace("'", "'\\''"))
-                    .append("'\n");
+            String absolutePath = wav.toAbsolutePath().toString();
+            // This escaping only handles ffmpeg's own quoting inside a 'file ...' line -- it does
+            // NOT handle a path starting with '#' (parsed as a comment by ffmpeg's concat demuxer)
+            // or one containing a newline. That's fine today because every path reaching this
+            // method is one this class generated itself (audio-N.wav in a fresh temp directory,
+            // never a user-chosen path), but this method must never be reused for user-supplied
+            // paths without revisiting this escaping first -- enforced here, not just documented.
+            if (absolutePath.indexOf('\n') >= 0 || absolutePath.indexOf('\r') >= 0 || absolutePath.startsWith("#")) {
+                throw new IllegalArgumentException(
+                        "Refusing to build an ffmpeg concat list from an unexpected path: " + absolutePath);
+            }
+            listContents.append("file '").append(absolutePath.replace("'", "'\\''")).append("'\n");
         }
         Files.writeString(listFile, listContents.toString(), StandardCharsets.UTF_8);
 
@@ -77,7 +90,7 @@ public final class AudioExtractor {
                     "-c", "copy",
                     outputWav.toString());
 
-            LOG.info("Concatenating {} audio files into {}", wavFiles.size(), outputWav);
+            LOG.info("Concatenating {} audio files into a single temporary WAV", wavFiles.size());
             ProcessRunner.run(command, handle, timeoutSeconds, forward(outputLineListener));
         } finally {
             Files.deleteIfExists(listFile);

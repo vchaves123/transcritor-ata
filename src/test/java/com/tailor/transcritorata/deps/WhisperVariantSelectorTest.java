@@ -25,7 +25,8 @@ class WhisperVariantSelectorTest {
 
         WhisperVariantSelector.applyBestVariant(config, gpuDetector, locator);
 
-        assertEquals("tools/whisper-cuda/Release/whisper-cli.exe", config.get(AppConfig.KEY_WHISPER_BINARY, null));
+        assertEquals(AppHome.resolve("tools/whisper-cuda/Release/whisper-cli.exe").toString(),
+                config.get(AppConfig.KEY_WHISPER_BINARY, null));
     }
 
     @Test
@@ -39,7 +40,8 @@ class WhisperVariantSelectorTest {
 
         WhisperVariantSelector.applyBestVariant(config, gpuDetector, locator);
 
-        assertEquals("tools/whisper-cpu/Release/whisper-cli.exe", config.get(AppConfig.KEY_WHISPER_BINARY, null));
+        assertEquals(AppHome.resolve("tools/whisper-cpu/Release/whisper-cli.exe").toString(),
+                config.get(AppConfig.KEY_WHISPER_BINARY, null));
     }
 
     @Test

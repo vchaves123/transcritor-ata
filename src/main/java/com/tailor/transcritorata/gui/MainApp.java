@@ -6,6 +6,7 @@ import org.eclipse.swt.widgets.Display;
 
 import com.tailor.transcritorata.config.AppConfig;
 import com.tailor.transcritorata.deps.BundledFfmpegSelector;
+import com.tailor.transcritorata.deps.BundledToolIntegrityChecker;
 import com.tailor.transcritorata.deps.ExecutableLocator;
 import com.tailor.transcritorata.deps.GpuDetector;
 import com.tailor.transcritorata.deps.WhisperVariantSelector;
@@ -33,6 +34,8 @@ public final class MainApp {
         Display display = new Display();
         try {
             AppConfig config = new AppConfig();
+
+            BundledToolIntegrityChecker.verify();
 
             ExecutableLocator locator = new ExecutableLocator.Default();
             BundledFfmpegSelector.applyIfBundlePresent(config, locator);
