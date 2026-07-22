@@ -78,16 +78,24 @@ is needed.
 ### 3. A Whisper model (`.bin`)
 
 **No need to download it manually**: the first time the application opens without a valid model
-configured, a dialog appears offering three options (small, medium — recommended, or large), with
-the approximate size and description of each. After choosing one and clicking "Download", the
-model is downloaded automatically to `tools/models/` and the preferences are adjusted
-automatically. You can also "Skip for now" and configure it manually later.
+configured, a dialog appears offering several options, with the approximate size and description
+of each. After choosing one and clicking "Download", the model is downloaded automatically to
+`tools/models/` and the preferences are adjusted automatically. You can also "Skip for now" and
+configure it manually later.
 
 If you'd rather download it yourself: https://huggingface.co/ggerganov/whisper.cpp/tree/main
 
-- `ggml-medium.bin` — recommended, good balance for CPU use.
-- `ggml-small.bin` — for more modest machines.
-- `ggml-large-v3.bin` — for those with a GPU available.
+- `ggml-medium-q5_0.bin` — **recommended**. Quantized version of Medium: ~514 MB (2.9x smaller)
+  and ~18% faster on CPU in local testing, with the same transcription output as full-precision
+  Medium on every recording tested so far — the best balance for most machines.
+- `ggml-small-q5_1.bin` — quantized version of Small: ~181 MB (2.6x smaller), ~20% faster, same
+  output as full-precision Small in testing. Pick this on more modest hardware.
+- `ggml-small.bin` / `ggml-medium.bin` / `ggml-large-v3.bin` — the original, full-precision
+  models, in case you ever see a difference in output quality vs. their quantized counterparts.
+- `ggml-large-v3-turbo-q5_0.bin` — a pruned+quantized variant of Large (~547 MB, ~5x smaller than
+  Large). **Not necessarily faster on CPU**: its encoder is still Large-sized, which dominates
+  runtime on short/medium recordings, so in local testing it was slower than Medium (compact).
+  Its speed advantage mainly applies on GPU or very long recordings.
 
 Save the file and select it in the application's preferences.
 

@@ -83,7 +83,7 @@ final class ModelSetupDialog {
         for (int i = 0; i < options.length; i++) {
             Button radio = new Button(dialog, SWT.RADIO);
             radio.setText(options[i].label() + " — " + options[i].description());
-            radio.setSelection(options[i] == WhisperModelOption.MEDIUM);
+            radio.setSelection(options[i] == WhisperModelOption.MEDIUM_Q5_0);
             radios[i] = radio;
         }
 
@@ -201,7 +201,7 @@ final class ModelSetupDialog {
                 return options[i];
             }
         }
-        return WhisperModelOption.MEDIUM;
+        return WhisperModelOption.MEDIUM_Q5_0;
     }
 
     private static String formatBytes(long bytes) {
