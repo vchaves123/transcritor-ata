@@ -2,10 +2,14 @@
 target/
 dependency-reduced-pom.xml
 
-# Empacotamento portavel (gerado pelo script de release; publicado como asset do GitHub Release)
+# Empacotamento portavel/instalador (gerado pelos scripts de release; publicado como asset do
+# GitHub Release)
 jpackage-input/
+jpackage-content/
 release/
+release-installer/
 transcritor-ata-portable-win64-*.zip
+transcritor-ata-*.msi
 
 # Eclipse
 .project

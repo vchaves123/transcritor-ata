@@ -130,11 +130,13 @@ The generated jar (`target/transcritor-ata.jar`) already includes all dependenci
 > On Windows, SWT runs normally on the main thread. The `-XstartOnFirstThread` flag is only
 > needed on macOS — it doesn't apply to normal use of this application on Windows.
 
-## Portable version (end-user release)
+## Installing (end-user release)
 
-For non-technical users, the recommended way to use transcritor-ata is the **portable version**:
-a `.zip` that requires no installation and no administrator privileges — just unzip it into any
-folder and run `transcritor-ata.exe`. It already includes:
+For non-technical users, the recommended way to use transcritor-ata is the **Windows installer**
+(`.msi`): download it, double-click, and follow the wizard — no administrator privileges required
+(it installs for the current user only). It adds a Start Menu entry, an optional Desktop shortcut,
+and a normal "Uninstall" entry under Windows Settings → Apps. Installing a newer version
+automatically upgrades/replaces the previous one. It already includes:
 
 - A dedicated Java runtime (no need to have Java installed).
 - ffmpeg.
@@ -147,12 +149,29 @@ choose the size and downloads it automatically.
 
 Download the latest version from the [Releases](../../releases) tab of this repository.
 
-### Building the portable package yourself
+A **portable version** (`.zip`, extract-and-run, no install/uninstall entry at all) is also
+published on the same Releases page, for cases where installing isn't an option (e.g. a locked-
+down machine, or running straight off a USB drive).
+
+### Building the release packages yourself
 
 Requires JDK 21 (with `jpackage` on the PATH), Maven, and the `tools/` folder already populated
 with ffmpeg and whisper-cli (see the prerequisites above — the easiest way is to run the
 application itself once, which already downloads/organizes all of this into the expected
 structure).
+
+**Installer (`.msi`)** — additionally requires the
+[WiX Toolset](https://github.com/wixtoolset/wix3/releases) 3.x (`candle.exe`/`light.exe` on PATH;
+`winget install WiXToolset.WiXToolset` also works if winget is functioning correctly):
+
+```powershell
+.\package-installer.ps1
+```
+
+This compiles the project, generates the app image with `jpackage`, bundles the external tools
+into it, and produces `release-installer\transcritor-ata-<version>.msi`.
+
+**Portable (`.zip`)**:
 
 ```powershell
 .\package-portable.ps1
@@ -160,9 +179,10 @@ structure).
 
 This compiles the project, generates an app-image with `jpackage`, bundles the external tools
 alongside it (without the Whisper model), and produces
-`transcritor-ata-portable-win64-<version>.zip` at the project root. This `.zip` **is not tracked
-in git** (it's too large) — publish it as an asset of a [GitHub Release](../../releases) instead
-of committing it.
+`transcritor-ata-portable-win64-<version>.zip` at the project root.
+
+Neither the `.msi` nor the `.zip` are tracked in git (both are too large) — publish them as assets
+of a [GitHub Release](../../releases) instead of committing them.
 
 ## Importing into Eclipse
 
