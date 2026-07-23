@@ -1,0 +1,116 @@
+name: Release
+
+# Builds the Windows installer (.msi) and portable (.zip) packages and publishes them as a
+# GitHub Release. Triggered by pushing a tag like "v1.0.7" (the leading "v" is stripped to get
+# the package version), or manually via "Run workflow" with an explicit version input.
+#
+# The external tools bundled into every release (ffmpeg, whisper-cli CPU/CUDA) are NOT committed
+# to this repo (see .gitignore) -- this workflow downloads them fresh from their upstream
+# releases on every run, matching the layout documented in README.md's prerequisites section.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (e.g. 1.0.7, no leading v)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "${{ github.event.inputs.version }}"
+          } else {
+            $version = "${{ github.ref_name }}" -replace '^v', ''
+          }
+          Write-Host "Building version $version"
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run tests
+        run: mvn -B -q clean test
+
+      - name: Install WiX Toolset
+        run: choco install wixtoolset --version=3.14.1 -y
+
+      - name: Download ffmpeg (BtbN, LGPL shared-free build)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl.zip" -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg-extracted
+          # The BtbN zip wraps everything in a single version-named folder; flatten it so
+          # ffmpeg.exe ends up directly at tools/ffmpeg/bin/ffmpeg.exe, as the app expects.
+          $inner = Get-ChildItem ffmpeg-extracted | Select-Object -First 1
+          New-Item -ItemType Directory -Path tools/ffmpeg -Force | Out-Null
+          Copy-Item "$($inner.FullName)\*" tools/ffmpeg -Recurse -Force
+
+      - name: Download whisper.cpp (CPU + CUDA builds)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $release = Invoke-RestMethod "https://api.github.com/repos/ggml-org/whisper.cpp/releases/latest"
+          $cpuAsset = $release.assets | Where-Object { $_.name -eq "whisper-bin-x64.zip" } | Select-Object -First 1
+          $cudaAsset = $release.assets | Where-Object { $_.name -match "^whisper-cublas-.*-bin-x64\.zip$" } |
+              Sort-Object name -Descending | Select-Object -First 1
+          if (-not $cpuAsset -or -not $cudaAsset) { throw "Could not find expected whisper.cpp release assets." }
+          Write-Host "whisper.cpp $($release.tag_name): CPU=$($cpuAsset.name) CUDA=$($cudaAsset.name)"
+          Invoke-WebRequest -Uri $cpuAsset.browser_download_url -OutFile whisper-cpu.zip
+          Invoke-WebRequest -Uri $cudaAsset.browser_download_url -OutFile whisper-cuda.zip
+          # These zips already contain a "Release/" folder at their root, matching the layout
+          # tools/whisper-cpu/ and tools/whisper-cuda/ are expected to have.
+          Expand-Archive whisper-cpu.zip -DestinationPath tools/whisper-cpu -Force
+          Expand-Archive whisper-cuda.zip -DestinationPath tools/whisper-cuda -Force
+
+      - name: Build installer (.msi)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $wixBin = "C:\Program Files (x86)\WiX Toolset v3.14\bin"
+          $env:Path = "$wixBin;$env:Path"
+          .\package-installer.ps1 -Version "${{ steps.version.outputs.version }}"
+
+      - name: Build portable package (.zip)
+        shell: pwsh
+        run: .\package-portable.ps1 -Version "${{ steps.version.outputs.version }}"
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = "${{ steps.version.outputs.version }}"
+          $tag = "v$version"
+          $msi = Get-ChildItem "release-installer\*.msi" | Select-Object -First 1
+          $zip = Get-ChildItem "transcritor-ata-portable-win64-*.zip" | Select-Object -First 1
+
+          # Idempotent: creates the tag/release if it doesn't exist yet (workflow_dispatch runs
+          # without a pre-existing tag), or just uploads the assets if the tag-push trigger
+          # already has the tag and gh has auto-created a draft/notes for it.
+          $existing = gh release view $tag 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag $msi.FullName $zip.FullName --title "transcritor-ata $tag" --generate-notes
+          } else {
+            gh release upload $tag $msi.FullName $zip.FullName --clobber
+          }
