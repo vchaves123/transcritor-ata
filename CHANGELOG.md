@@ -6,6 +6,8 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+## [1.0.10] - 2026-07-23
+
 ### Security
 - The extracted VAD model file is now re-verified (SHA-256 against the bundled jar resource)
   every time it's reused, instead of only checking it exists. Found during a security audit: a
@@ -165,7 +167,8 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 Initial release: video-to-minutes transcription pipeline (ffmpeg + whisper.cpp), optional speaker
 identification, `.docx` minutes generation, SWT desktop GUI, and a portable Windows package.
 
-[Unreleased]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.9...HEAD
+[Unreleased]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.10...HEAD
+[1.0.10]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.9...v1.0.10
 [1.0.9]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.8...v1.0.9
 [1.0.8]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.7...v1.0.8
 [1.0.7]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.6...v1.0.7
