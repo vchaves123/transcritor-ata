@@ -4,7 +4,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -44,6 +43,7 @@ import com.tailor.transcritorata.transcription.AdaptiveWhisperEngine;
 import com.tailor.transcritorata.transcription.PipelineResult;
 import com.tailor.transcritorata.transcription.TranscriptionEngine;
 import com.tailor.transcritorata.transcription.TranscriptionPipeline;
+import com.tailor.transcritorata.transcription.WhisperModelSelector;
 
 /** The application's single main window. */
 public final class MainWindow {
@@ -751,7 +751,7 @@ public final class MainWindow {
 
         Path configuredModelPath = Path.of(config.get(AppConfig.KEY_WHISPER_MODEL, ""));
         List<AdaptiveWhisperEngine.ModelCandidate> candidates = discoverModelCandidates(configuredModelPath);
-        Path cpuFallbackModel = candidates.isEmpty() ? configuredModelPath : candidates.get(0).path();
+        Path cpuFallbackModel = WhisperModelSelector.selectCpuFallback(candidates, configuredModelPath);
 
         boolean preferFastModeFirst = config.getBoolean(AppConfig.KEY_WHISPER_FAST_MODE, false);
         GpuDetector gpuDetector = new GpuDetector(new ExecutableLocator.Default());
@@ -761,9 +761,11 @@ public final class MainWindow {
     }
 
     /**
-     * Locally available Whisper models, sorted largest-first: every known size (Small/Medium/
-     * Large) found next to the configured model, plus the configured model itself (in case it's a
-     * custom file that doesn't match one of those names) — deduplicated by path.
+     * Locally available Whisper models, used by {@link AdaptiveWhisperEngine} for the GPU
+     * cascade: every known model (Small/Medium/Large and their quantized variants) found next to
+     * the configured model, plus the configured model itself (in case it's a custom file that
+     * doesn't match one of those names) — deduplicated by path, ordered via
+     * {@link WhisperModelSelector#orderForGpuCascade(List)}.
      */
     private static List<AdaptiveWhisperEngine.ModelCandidate> discoverModelCandidates(Path configuredModelPath) {
         Path modelsDir = configuredModelPath.getParent();
@@ -777,8 +779,7 @@ public final class MainWindow {
         }
         addCandidateIfFile(candidates, configuredModelPath);
 
-        candidates.sort(Comparator.comparingLong(AdaptiveWhisperEngine.ModelCandidate::sizeBytes).reversed());
-        return candidates;
+        return WhisperModelSelector.orderForGpuCascade(candidates);
     }
 
     private static void addCandidateIfFile(List<AdaptiveWhisperEngine.ModelCandidate> candidates, Path path) {
