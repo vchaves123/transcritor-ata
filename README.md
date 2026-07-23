@@ -233,3 +233,4 @@ Licensed under the [GNU General Public License v3.0](LICENSE) (GPLv3).
 - [CHANGELOG.md](CHANGELOG.md) — notable changes per release.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — build/test workflow and how to cut a release.
 - [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) — licenses of bundled third-party components.
+- [PRIVACY.md](PRIVACY.md) — what data this app processes, stores, and sends over the network.
