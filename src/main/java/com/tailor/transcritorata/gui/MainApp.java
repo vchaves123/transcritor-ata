@@ -17,6 +17,8 @@ import com.tailor.transcritorata.deps.WhisperVariantSelector;
  */
 public final class MainApp {
 
+    private static final String UNINSTALL_CLEANUP_ARG = "--uninstall-cleanup";
+
     public static void main(String[] args) {
         // Computed without touching AppConfig (or any other class with a static Logger field):
         // loading such a class would initialize logback before this system property is set,
@@ -29,6 +31,13 @@ public final class MainApp {
         System.setProperty("transcritorata.logDir", logsDir.toString());
 
         org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MainApp.class);
+
+        if (args.length > 0 && UNINSTALL_CLEANUP_ARG.equals(args[0])) {
+            log.info("Running uninstall cleanup");
+            UninstallCleanup.run();
+            return;
+        }
+
         log.info("Starting transcritor-ata");
 
         Display display = new Display();
