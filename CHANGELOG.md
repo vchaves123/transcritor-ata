@@ -11,6 +11,10 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
   every time it's reused, instead of only checking it exists. Found during a security audit: a
   stale copy corrupted on disk or altered by another process running as the same user would
   otherwise be silently fed to whisper.cpp's native model loader without detection.
+- The startup update check now caps how much of the GitHub API response it reads (1 MiB) instead
+  of loading it into memory unbounded, and refuses to open a "Download" link whose URL isn't
+  actually a `github.com/.../transcritor-ata/releases/...` link, instead of trusting whatever the
+  response contained.
 
 ### Changed
 - Speaker clustering now uses average-linkage instead of single-linkage agglomerative
