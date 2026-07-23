@@ -51,10 +51,11 @@ public final class GpuDetector {
     /** @return the total VRAM of the (first) NVIDIA GPU in MB, or empty if it couldn't be read. */
     public Optional<Long> vramMb() {
         List<String> command = List.of(nvidiaSmiExecutable, "--query-gpu=memory.total", "--format=csv,noheader,nounits");
+        Process process = null;
         try {
             ProcessBuilder builder = new ProcessBuilder(command);
             builder.redirectErrorStream(false);
-            Process process = builder.start();
+            process = builder.start();
             String firstLine;
             try (BufferedReader reader = new BufferedReader(
                     new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
@@ -72,6 +73,13 @@ public final class GpuDetector {
                 Thread.currentThread().interrupt();
             }
             return Optional.empty();
+        } finally {
+            // Defensive backstop: an exception thrown between start() and waitFor() (e.g. while
+            // reading the output stream) would otherwise leave nvidia-smi running unmanaged until
+            // it exits on its own.
+            if (process != null && process.isAlive()) {
+                process.destroyForcibly();
+            }
         }
     }
 }

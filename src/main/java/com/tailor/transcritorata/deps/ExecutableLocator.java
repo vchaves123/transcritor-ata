@@ -27,10 +27,11 @@ public interface ExecutableLocator {
 
         @Override
         public boolean canRun(List<String> command, long timeoutSeconds) {
+            Process process = null;
             try {
                 ProcessBuilder builder = new ProcessBuilder(command);
                 builder.redirectErrorStream(true);
-                Process process = builder.start();
+                process = builder.start();
                 process.getInputStream().readAllBytes();
                 boolean finished = process.waitFor(timeoutSeconds, java.util.concurrent.TimeUnit.SECONDS);
                 if (!finished) {
@@ -43,6 +44,13 @@ public interface ExecutableLocator {
                     Thread.currentThread().interrupt();
                 }
                 return false;
+            } finally {
+                // Defensive backstop: an exception thrown between start() and waitFor() (e.g.
+                // while reading the output stream) would otherwise leave the probed executable
+                // running unmanaged until it exits on its own.
+                if (process != null && process.isAlive()) {
+                    process.destroyForcibly();
+                }
             }
         }
 

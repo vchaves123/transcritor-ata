@@ -30,10 +30,11 @@ public final class VideoProbe {
     public static Optional<Duration> probeDuration(String ffprobeExecutable, Path video) {
         List<String> command = List.of(ffprobeExecutable, "-v", "error", "-show_entries", "format=duration",
                 "-of", "default=noprint_wrappers=1:nokey=1", video.toString());
+        Process process = null;
         try {
             ProcessBuilder builder = new ProcessBuilder(command);
             builder.redirectErrorStream(false);
-            Process process = builder.start();
+            process = builder.start();
             String output;
             try (BufferedReader reader = new BufferedReader(
                     new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
@@ -52,6 +53,13 @@ public final class VideoProbe {
                 Thread.currentThread().interrupt();
             }
             return Optional.empty();
+        } finally {
+            // Defensive backstop: an exception thrown between start() and waitFor() (e.g. while
+            // reading the output stream) would otherwise leave ffprobe running unmanaged until it
+            // exits on its own.
+            if (process != null && process.isAlive()) {
+                process.destroyForcibly();
+            }
         }
     }
 
