@@ -6,6 +6,8 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+## [1.0.8] - 2026-07-23
+
 ### Added
 - On startup, the app checks GitHub for a newer release and, if one is found, offers to open its
   download page or dismiss the notice.
@@ -126,7 +128,8 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 Initial release: video-to-minutes transcription pipeline (ffmpeg + whisper.cpp), optional speaker
 identification, `.docx` minutes generation, SWT desktop GUI, and a portable Windows package.
 
-[Unreleased]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.7...HEAD
+[Unreleased]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.8...HEAD
+[1.0.8]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.7...v1.0.8
 [1.0.7]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.4...v1.0.5

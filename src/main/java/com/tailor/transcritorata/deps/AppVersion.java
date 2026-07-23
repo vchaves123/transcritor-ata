@@ -6,7 +6,7 @@ package com.tailor.transcritorata.deps;
  */
 public final class AppVersion {
 
-    public static final String CURRENT = "1.0.7";
+    public static final String CURRENT = "1.0.8";
 
     private AppVersion() {
     }
