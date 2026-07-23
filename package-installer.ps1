@@ -83,6 +83,10 @@ Write-Host "== 5/6: Generating .msi installer with jpackage ==" -ForegroundColor
 # the C1 compiler remains), an acceptable trade-off for stability for non-technical end users.
 # --app-content: bundles the prepared tools/ folder (ffmpeg, whisper-cli, checksum manifest)
 # alongside the launcher exe in the installed app's own folder.
+# --license-file: without it, jpackage emits a bare-bones WiX UI (just a progress dialog) that
+# closes itself the instant the install finishes -- no confirmation that it succeeded. Passing a
+# license file switches jpackage to the full WixUI_Minimal wizard (Welcome -> License -> Progress
+# -> Finish), which is what actually shows the user a "installation completed successfully" screen.
 & jpackage `
     --type msi `
     --input $StagingDir `
@@ -93,6 +97,7 @@ Write-Host "== 5/6: Generating .msi installer with jpackage ==" -ForegroundColor
     --vendor "Tailor" `
     --description "Meeting recording transcription and minutes generation" `
     --icon (Join-Path $ProjectRoot "packaging\app.ico") `
+    --license-file (Join-Path $ProjectRoot "LICENSE") `
     --java-options "-XX:TieredStopAtLevel=1" `
     --app-content $ToolsStagingDir `
     --win-menu `

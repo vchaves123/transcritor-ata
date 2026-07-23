@@ -6,6 +6,14 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+## [1.0.9] - 2026-07-23
+
+### Fixed
+- The installer now shows a confirmation screen ("Completed the transcritor-ata Setup Wizard") when
+  it finishes, instead of silently closing with no feedback. jpackage's default MSI UI has no
+  Welcome/License/Finish pages unless a license file is supplied; the installer now embeds
+  `LICENSE` (GPLv3) for exactly this purpose.
+
 ## [1.0.8] - 2026-07-23
 
 ### Added
@@ -128,7 +136,8 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 Initial release: video-to-minutes transcription pipeline (ffmpeg + whisper.cpp), optional speaker
 identification, `.docx` minutes generation, SWT desktop GUI, and a portable Windows package.
 
-[Unreleased]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.8...HEAD
+[Unreleased]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.9...HEAD
+[1.0.9]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.8...v1.0.9
 [1.0.8]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.7...v1.0.8
 [1.0.7]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.5...v1.0.6
