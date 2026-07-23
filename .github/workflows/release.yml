@@ -1,8 +1,8 @@
 name: Release
 
-# Builds the Windows installer (.msi) and portable (.zip) packages and publishes them as a
-# GitHub Release. Triggered by pushing a tag like "v1.0.7" (the leading "v" is stripped to get
-# the package version), or manually via "Run workflow" with an explicit version input.
+# Builds the Windows installer (.msi) and publishes it as a GitHub Release. Triggered by pushing
+# a tag like "v1.0.7" (the leading "v" is stripped to get the package version), or manually via
+# "Run workflow" with an explicit version input.
 #
 # The external tools bundled into every release (ffmpeg, whisper-cli CPU/CUDA) are NOT committed
 # to this repo (see .gitignore) -- this workflow downloads them fresh from their upstream
@@ -101,10 +101,6 @@ jobs:
           $env:Path = "$wixBin;$env:Path"
           .\package-installer.ps1 -Version "${{ steps.version.outputs.version }}"
 
-      - name: Build portable package (.zip)
-        shell: pwsh
-        run: .\package-portable.ps1 -Version "${{ steps.version.outputs.version }}"
-
       - name: Publish GitHub Release
         shell: pwsh
         env:
@@ -114,14 +110,13 @@ jobs:
           $version = "${{ steps.version.outputs.version }}"
           $tag = "v$version"
           $msi = Get-ChildItem "release-installer\*.msi" | Select-Object -First 1
-          $zip = Get-ChildItem "transcritor-ata-portable-win64-*.zip" | Select-Object -First 1
 
           # Idempotent: creates the tag/release if it doesn't exist yet (workflow_dispatch runs
-          # without a pre-existing tag), or just uploads the assets if the tag-push trigger
+          # without a pre-existing tag), or just uploads the asset if the tag-push trigger
           # already has the tag and gh has auto-created a draft/notes for it.
           $existing = gh release view $tag 2>$null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $tag $msi.FullName $zip.FullName --title "transcritor-ata $tag" --generate-notes
+            gh release create $tag $msi.FullName --title "transcritor-ata $tag" --generate-notes
           } else {
-            gh release upload $tag $msi.FullName $zip.FullName --clobber
+            gh release upload $tag $msi.FullName --clobber
           }

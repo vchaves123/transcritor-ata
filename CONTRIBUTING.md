@@ -50,8 +50,7 @@ Releases are built and published automatically by
    git push origin vX.Y.Z
    ```
 3. The workflow compiles the jar, runs the tests, downloads ffmpeg/whisper.cpp, builds the `.msi`
-   installer and the portable `.zip`, and publishes both as a GitHub Release.
+   installer, and publishes it as a GitHub Release.
 
-See [`package-installer.ps1`](package-installer.ps1) and [`package-portable.ps1`](package-portable.ps1)
-if you need to build these packages locally instead (e.g. to test a packaging change before
-pushing a tag).
+See [`package-installer.ps1`](package-installer.ps1) if you need to build the installer locally
+instead (e.g. to test a packaging change before pushing a tag).

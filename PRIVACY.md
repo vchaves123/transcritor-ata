@@ -45,8 +45,8 @@ sign-in.
 - **Logs**: `%APPDATA%\transcritor-ata\logs\`, rotated daily, kept for 14 days. These may contain
   file *names* (e.g. the video file you transcribed) for troubleshooting, but full folder paths
   are deliberately kept out of both the on-screen log panel and the log files.
-- **Downloaded models**: saved under the app's own `tools/models/` folder (in your install
-  directory, or next to the portable `.exe`), not in the OS-wide model cache.
+- **Downloaded models**: saved under the app's own `tools/models/` folder in your install
+  directory, not in the OS-wide model cache.
 
 Uninstalling the app does not automatically delete `%APPDATA%\transcritor-ata\` or the downloaded
 models folder; remove them yourself if you want a completely clean uninstall.

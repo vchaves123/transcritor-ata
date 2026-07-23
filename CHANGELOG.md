@@ -6,6 +6,10 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+### Removed
+- The portable `.zip` package. The Windows installer (`.msi`) is now the only distributed
+  release artifact.
+
 ### Fixed
 - Whisper model download failures are now logged (previously only shown in the dialog and then lost).
 - `package-installer.ps1`/CI no longer fails when the WiX Toolset is already present on the build machine.

@@ -149,18 +149,11 @@ choose the size and downloads it automatically.
 
 Download the latest version from the [Releases](../../releases) tab of this repository.
 
-A **portable version** (`.zip`, extract-and-run, no install/uninstall entry at all) is also
-published on the same Releases page, for cases where installing isn't an option (e.g. a locked-
-down machine, or running straight off a USB drive).
+### Building the installer yourself
 
-### Building the release packages yourself
-
-Requires JDK 21 (with `jpackage` on the PATH), Maven, and the `tools/` folder already populated
-with ffmpeg and whisper-cli (see the prerequisites above — the easiest way is to run the
-application itself once, which already downloads/organizes all of this into the expected
-structure).
-
-**Installer (`.msi`)** — additionally requires the
+Requires JDK 21 (with `jpackage` on the PATH), Maven, the `tools/` folder already populated with
+ffmpeg and whisper-cli (see the prerequisites above — the easiest way is to run the application
+itself once, which already downloads/organizes all of this into the expected structure), and the
 [WiX Toolset](https://github.com/wixtoolset/wix3/releases) 3.x (`candle.exe`/`light.exe` on PATH;
 `winget install WiXToolset.WiXToolset` also works if winget is functioning correctly):
 
@@ -169,20 +162,9 @@ structure).
 ```
 
 This compiles the project, generates the app image with `jpackage`, bundles the external tools
-into it, and produces `release-installer\transcritor-ata-<version>.msi`.
-
-**Portable (`.zip`)**:
-
-```powershell
-.\package-portable.ps1
-```
-
-This compiles the project, generates an app-image with `jpackage`, bundles the external tools
-alongside it (without the Whisper model), and produces
-`transcritor-ata-portable-win64-<version>.zip` at the project root.
-
-Neither the `.msi` nor the `.zip` are tracked in git (both are too large) — publish them as assets
-of a [GitHub Release](../../releases) instead of committing them.
+into it, and produces `release-installer\transcritor-ata-<version>.msi`. It's not tracked in git
+(too large) — publish it as an asset of a [GitHub Release](../../releases) instead of committing
+it.
 
 ## Importing into Eclipse
 

@@ -1,11 +1,9 @@
 # Builds a Windows installer (.msi) for transcritor-ata using jpackage + WiX Toolset 3.x.
 #
-# Unlike the portable app-image (package-portable.ps1, extract-and-run), this produces a proper
-# installer that non-technical users can just double-click: it adds Start Menu / Desktop
+# A proper installer that non-technical users can just double-click: it adds Start Menu / Desktop
 # shortcuts, registers the app in "Add or Remove Programs" (including a real Uninstall entry),
 # and supports in-place upgrades across versions via a fixed --win-upgrade-uuid. It installs
-# per-user (no administrator privileges / UAC prompt required), matching the portable build's
-# no-admin-needed spirit.
+# per-user, so no administrator privileges / UAC prompt are required.
 #
 # Usage:
 #   .\package-installer.ps1 [-Version 1.0.0]
@@ -84,7 +82,7 @@ Write-Host "== 5/6: Generating .msi installer with jpackage ==" -ForegroundColor
 # with Temurin 21.0.11 -- a JIT bug, not an application bug. Some peak performance is lost (only
 # the C1 compiler remains), an acceptable trade-off for stability for non-technical end users.
 # --app-content: bundles the prepared tools/ folder (ffmpeg, whisper-cli, checksum manifest)
-# alongside the launcher exe in the installed app's own folder, exactly like the portable build.
+# alongside the launcher exe in the installed app's own folder.
 & jpackage `
     --type msi `
     --input $StagingDir `
