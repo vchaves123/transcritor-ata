@@ -48,9 +48,8 @@ final class ModelSetupDialog {
         Shell dialog = new Shell(display, SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
         AppIcon.apply(dialog);
         open(dialog, display, config, "Initial setup — transcription model",
-                "To transcribe meetings, transcritor-ata needs a Whisper model. "
-                        + "Choose an option below to download it automatically (the file will be saved to "
-                        + MODELS_DIR + "/ and your preferences will be adjusted automatically):",
+                "transcritor-ata needs a Whisper model to transcribe meetings. Choose an option "
+                        + "below to download it automatically:",
                 "Skip for now");
     }
 
@@ -60,12 +59,12 @@ final class ModelSetupDialog {
         AppIcon.apply(dialog);
         open(dialog, parent.getDisplay(), config,
                 "Download another transcription model",
-                "Choose a model to download. Smaller models use less memory (RAM/VRAM) and are faster, "
-                        + "but transcribe with less accuracy — a good option if you had memory problems "
-                        + "with the current model. The file will be saved to " + MODELS_DIR
-                        + "/ and your preferences will be adjusted automatically:",
+                "Choose a model to download. Smaller models use less memory and are faster, with "
+                        + "some loss in accuracy:",
                 "Close");
     }
+
+    private static final int DIALOG_WIDTH = 340;
 
     private static void open(Shell dialog, Display display, AppConfig config, String title, String introText,
             String closeButtonLabel) {
@@ -75,22 +74,40 @@ final class ModelSetupDialog {
         Label intro = new Label(dialog, SWT.WRAP);
         intro.setText(introText);
         GridData introData = new GridData(SWT.FILL, SWT.CENTER, true, false);
-        introData.widthHint = 480;
+        introData.widthHint = DIALOG_WIDTH;
         intro.setLayoutData(introData);
 
         WhisperModelOption[] options = WhisperModelOption.values();
         Button[] radios = new Button[options.length];
         for (int i = 0; i < options.length; i++) {
             Button radio = new Button(dialog, SWT.RADIO);
-            radio.setText(options[i].label() + " — " + options[i].description());
-            radio.setSelection(options[i] == WhisperModelOption.MEDIUM);
+            radio.setText(options[i].label());
+            radio.setSelection(options[i] == WhisperModelOption.MEDIUM_Q5_0);
+            GridData radioData = new GridData(SWT.FILL, SWT.CENTER, true, false);
+            radioData.verticalIndent = 6;
+            radio.setLayoutData(radioData);
             radios[i] = radio;
+
+            Label description = new Label(dialog, SWT.WRAP);
+            description.setText(options[i].description());
+            GridData descriptionData = new GridData(SWT.FILL, SWT.CENTER, true, false);
+            descriptionData.widthHint = DIALOG_WIDTH;
+            descriptionData.horizontalIndent = 20;
+            description.setLayoutData(descriptionData);
         }
+
+        Label savedTo = new Label(dialog, SWT.WRAP);
+        savedTo.setText("Saved to " + MODELS_DIR + "/; preferences adjusted automatically.");
+        GridData savedToData = new GridData(SWT.FILL, SWT.CENTER, true, false);
+        savedToData.widthHint = DIALOG_WIDTH;
+        savedToData.verticalIndent = 8;
+        savedTo.setLayoutData(savedToData);
 
         Label statusLabel = new Label(dialog, SWT.WRAP);
         statusLabel.setText(" ");
         GridData statusData = new GridData(SWT.FILL, SWT.CENTER, true, false);
-        statusData.widthHint = 480;
+        statusData.widthHint = DIALOG_WIDTH;
+        statusData.verticalIndent = 8;
         statusLabel.setLayoutData(statusData);
 
         ProgressBar progressBar = new ProgressBar(dialog, SWT.SMOOTH);
@@ -201,7 +218,7 @@ final class ModelSetupDialog {
                 return options[i];
             }
         }
-        return WhisperModelOption.MEDIUM;
+        return WhisperModelOption.MEDIUM_Q5_0;
     }
 
     private static String formatBytes(long bytes) {
