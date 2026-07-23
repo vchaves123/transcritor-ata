@@ -1,6 +1,5 @@
 package com.tailor.transcritorata.transcription;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -106,7 +105,7 @@ class TranscriptionPipelineTest {
         doThrow(new DiarizationException("model failed", null)).when(diarizer)
                 .diarize(any(), any(), any());
 
-        var attributedCaptor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<AttributedSegment>> attributedCaptor = listCaptor();
         TranscriptionPipeline pipeline = new TranscriptionPipeline(audioExtractor, engine, docxGenerator, diarizer, true);
         List<Path> videos = List.of(Path.of("a.mp4"), Path.of("b.mp4"));
 
@@ -115,9 +114,14 @@ class TranscriptionPipelineTest {
 
         verify(docxGenerator).generateSimpleMinutesAttributed(any(Path.class), any(MeetingMetadata.class),
                 attributedCaptor.capture());
-        @SuppressWarnings("unchecked")
-        List<AttributedSegment> attributed = (List<AttributedSegment>) attributedCaptor.getValue();
+        List<AttributedSegment> attributed = attributedCaptor.getValue();
         assertEquals(1, attributed.size());
         assertNull(attributed.get(0).speakerLabel(), "a failed diarization must fall back to no speaker labels");
+    }
+
+    /** Isolates the single unchecked cast Mockito's raw-typed {@code ArgumentCaptor.forClass(List.class)} requires. */
+    @SuppressWarnings("unchecked")
+    private static <T> ArgumentCaptor<List<T>> listCaptor() {
+        return (ArgumentCaptor<List<T>>) (ArgumentCaptor<?>) ArgumentCaptor.forClass(List.class);
     }
 }
