@@ -6,6 +6,13 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+### Changed
+- Speaker clustering now uses average-linkage instead of single-linkage agglomerative
+  clustering, to avoid the "chaining effect": previously, a single similar-sounding segment pair
+  (background noise, cross-talk, a whisper) between two different speakers was enough to merge
+  their entire clusters into one. Average linkage requires the clusters to be close as a whole,
+  not just at one point.
+
 ## [1.0.9] - 2026-07-23
 
 ### Fixed

@@ -71,7 +71,7 @@ final class SpeakerClusterer {
         }
 
         double distanceThreshold = Math.max((350.0 - totalDuration) / 350.0, 0.73);
-        int[] longLabels = AgglomerativeClustering.fitSingleLinkage(longEmbeddings, distanceThreshold);
+        int[] longLabels = AgglomerativeClustering.fitAverageLinkage(longEmbeddings, distanceThreshold);
 
         int[] labels = new int[n];
         for (int i = 0; i < longIndices.size(); i++) {

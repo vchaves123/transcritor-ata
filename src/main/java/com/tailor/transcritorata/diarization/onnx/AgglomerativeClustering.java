@@ -4,9 +4,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Single-linkage agglomerative clustering with a distance threshold (Euclidean), matching
- * {@code sklearn.cluster.AgglomerativeClustering(n_clusters=None, distance_threshold=..., metric='euclidean', linkage='single')}
+ * Average-linkage agglomerative clustering with a distance threshold (Euclidean), matching
+ * {@code sklearn.cluster.AgglomerativeClustering(n_clusters=None, distance_threshold=..., metric='euclidean', linkage='average')}
  * for the case (used by our pipeline) where the number of speakers is not known in advance.
+ *
+ * <p>Average linkage (mean distance between every cross-cluster pair) was chosen over single
+ * linkage (nearest cross-cluster pair) to avoid the "chaining effect": with single linkage, a
+ * single similar-sounding segment pair (background noise, cross-talk, a whisper) is enough to
+ * merge two otherwise-distinct speakers' entire clusters into one. Average linkage requires the
+ * clusters to be close as a whole, not just at one point.
  */
 final class AgglomerativeClustering {
 
@@ -14,7 +20,7 @@ final class AgglomerativeClustering {
     }
 
     /** @return a 0-indexed cluster label per input point. */
-    static int[] fitSingleLinkage(float[][] points, double distanceThreshold) {
+    static int[] fitAverageLinkage(float[][] points, double distanceThreshold) {
         int n = points.length;
         if (n == 0) {
             return new int[0];
@@ -62,7 +68,7 @@ final class AgglomerativeClustering {
                 for (int b = a + 1; b < activeIds.size(); b++) {
                     int idA = activeIds.get(a);
                     int idB = activeIds.get(b);
-                    double linkageDistance = singleLinkageDistance(members.get(idA), members.get(idB), pointDist);
+                    double linkageDistance = averageLinkageDistance(members.get(idA), members.get(idB), pointDist);
                     if (linkageDistance < bestDistance) {
                         bestDistance = linkageDistance;
                         bestA = idA;
@@ -86,14 +92,14 @@ final class AgglomerativeClustering {
         return relabelContiguously(clusterOf);
     }
 
-    private static double singleLinkageDistance(List<Integer> clusterA, List<Integer> clusterB, double[][] pointDist) {
-        double min = Double.MAX_VALUE;
+    private static double averageLinkageDistance(List<Integer> clusterA, List<Integer> clusterB, double[][] pointDist) {
+        double sum = 0;
         for (int i : clusterA) {
             for (int j : clusterB) {
-                min = Math.min(min, pointDist[i][j]);
+                sum += pointDist[i][j];
             }
         }
-        return min;
+        return sum / (clusterA.size() * clusterB.size());
     }
 
     private static double euclidean(float[] a, float[] b) {
