@@ -54,12 +54,15 @@ Copy-Item $ToolsSrc $ToolsStagingDir -Recurse
 $ModelsDir = Join-Path $ToolsStagingDir "models"
 if (Test-Path $ModelsDir) { Remove-Item $ModelsDir -Recurse -Force }
 
-# SHA-256 manifest of every bundled executable: lets the app notice (and warn about, not block on
-# -- this manifest ships inside the same installer, so it can't defend against the installer
-# itself being tampered with) local corruption or in-place modification of these binaries *after*
-# installation.
+# SHA-256 manifest of every bundled executable AND library: lets the app notice (and warn about,
+# not block on -- this manifest ships inside the same installer, so it can't defend against the
+# installer itself being tampered with) local corruption or in-place modification of these files
+# *after* installation. Covers .dll too, not just .exe: whisper-cli loads ~49 DLLs (ggml.dll,
+# whisper.dll, CUDA runtime DLLs, ...) into its own process with full code-execution capability --
+# a tampered DLL is just as dangerous as a tampered .exe, so it must be checked too.
 $ChecksumsFile = Join-Path $ToolsStagingDir "CHECKSUMS.sha256"
-$ChecksumLines = Get-ChildItem -Path $ToolsStagingDir -Recurse -Filter "*.exe" | ForEach-Object {
+$ChecksumLines = Get-ChildItem -Path $ToolsStagingDir -Recurse |
+    Where-Object { $_.Extension -in ".exe", ".dll" } | ForEach-Object {
     $RelativePath = $_.FullName.Substring($ToolsStagingDir.Length + 1).Replace('\', '/')
     $Hash = (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLower()
     "$Hash  $RelativePath"

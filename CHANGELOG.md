@@ -23,6 +23,10 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
   security audit; the app was never actually exploitable via the CVEs logback has had in this
   range, since none of them apply without the optional Janino library, which this project doesn't
   depend on).
+- The bundled-tools checksum manifest now covers `.dll` files, not just `.exe`. whisper-cli loads
+  ~49 DLLs (ggml.dll, whisper.dll, CUDA runtime DLLs, ...) into its own process with full
+  code-execution capability; a tampered/corrupted DLL was previously invisible to the integrity
+  check entirely.
 
 ### Changed
 - Speaker clustering now uses average-linkage instead of single-linkage agglomerative
