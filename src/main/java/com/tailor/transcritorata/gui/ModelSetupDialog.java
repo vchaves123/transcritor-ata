@@ -14,6 +14,8 @@ import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.ProgressBar;
 import org.eclipse.swt.widgets.Shell;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.tailor.transcritorata.config.AppConfig;
 import com.tailor.transcritorata.deps.AppHome;
@@ -34,6 +36,7 @@ import com.tailor.transcritorata.deps.WhisperModelSetupChecker;
  */
 final class ModelSetupDialog {
 
+    private static final Logger LOG = LoggerFactory.getLogger(ModelSetupDialog.class);
     private static final String MODELS_DIR = "tools/models";
 
     private ModelSetupDialog() {
@@ -194,6 +197,7 @@ final class ModelSetupDialog {
                 dialog.close();
             });
         } catch (Exception ex) {
+            LOG.error("Failed to download Whisper model {}", chosen.fileName(), ex);
             display.asyncExec(() -> {
                 if (dialog.isDisposed()) {
                     return;
