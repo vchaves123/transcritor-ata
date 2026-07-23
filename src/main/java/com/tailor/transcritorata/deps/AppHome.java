@@ -24,11 +24,6 @@ public final class AppHome {
     private AppHome() {
     }
 
-    /** @return the directory that should contain this app's bundled "tools/" folder. */
-    public static Path directory() {
-        return DIRECTORY;
-    }
-
     /** @return {@code relativePath} resolved against the app's install directory (not the CWD). */
     public static Path resolve(String relativePath) {
         return DIRECTORY.resolve(relativePath);

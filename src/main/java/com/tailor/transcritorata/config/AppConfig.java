@@ -126,8 +126,4 @@ public final class AppConfig {
             return defaultValue;
         }
     }
-
-    public void setInt(String key, int value) {
-        set(key, Integer.toString(value));
-    }
 }
