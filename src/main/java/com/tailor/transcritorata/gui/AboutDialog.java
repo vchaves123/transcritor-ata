@@ -12,6 +12,8 @@ import org.eclipse.swt.widgets.Link;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Text;
 
+import com.tailor.transcritorata.deps.AppVersion;
+
 /**
  * "About" dialog: application/version info and the licenses of every third-party component
  * shipped with the app (Java libraries in the jar, external tools bundled alongside it, and the
@@ -19,7 +21,6 @@ import org.eclipse.swt.widgets.Text;
  */
 final class AboutDialog {
 
-    private static final String APP_VERSION = "1.0.7";
     private static final String REPO_URL = "https://github.com/vchaves123/transcritor-ata";
 
     private AboutDialog() {
@@ -36,7 +37,7 @@ final class AboutDialog {
         title.setFont(bold(title));
 
         Label version = new Label(dialog, SWT.NONE);
-        version.setText("Version " + APP_VERSION + " · © Tailor");
+        version.setText("Version " + AppVersion.CURRENT + " · © Tailor");
 
         Link repoLink = new Link(dialog, SWT.NONE);
         repoLink.setText("<a href=\"" + REPO_URL + "\">" + REPO_URL + "</a>");

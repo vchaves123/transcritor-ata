@@ -32,10 +32,16 @@ to run**, not sending any of your data:
   choose one in the setup dialog or Preferences.
 - Optionally, ffmpeg and whisper-cli builds, if you follow the README's "bundled" setup
   instructions to download them yourself.
+- On every startup, a request to GitHub's public releases API
+  (`api.github.com/repos/vchaves123/transcritor-ata/releases/latest`) to check whether a newer
+  version is available. This request doesn't include any of your data — it's the same as visiting
+  the [Releases](../../releases) page in a browser — and only the version number and release page
+  URL are read from the response. If it fails (offline, GitHub unreachable, etc.), it's silently
+  ignored and startup proceeds normally.
 
-These are plain HTTPS downloads *to* your machine; the app does not upload, phone home, or report
-usage/analytics of any kind. There is no telemetry, no crash reporting service, and no account or
-sign-in.
+These are plain HTTPS downloads *to* your machine (or a read-only version check); the app does not
+upload, phone home, or report usage/analytics of any kind. There is no telemetry, no crash
+reporting service, and no account or sign-in.
 
 ## What's stored locally, and where
 

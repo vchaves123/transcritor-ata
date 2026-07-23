@@ -41,8 +41,8 @@ Releases are built and published automatically by
 [`.github/workflows/release.yml`](.github/workflows/release.yml) when a `vX.Y.Z` tag is pushed
 (or via "Run workflow" in the Actions tab, giving a version number). To cut a release:
 
-1. Bump `APP_VERSION` in
-   [`AboutDialog.java`](src/main/java/com/tailor/transcritorata/gui/AboutDialog.java) and move the
+1. Bump `CURRENT` in
+   [`AppVersion.java`](src/main/java/com/tailor/transcritorata/deps/AppVersion.java) and move the
    `## [Unreleased]` section of `CHANGELOG.md` under a new `## [X.Y.Z] - YYYY-MM-DD` heading.
 2. Commit, push, then tag and push the tag:
    ```bash

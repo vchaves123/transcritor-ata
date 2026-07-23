@@ -6,6 +6,10 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+### Added
+- On startup, the app checks GitHub for a newer release and, if one is found, offers to open its
+  download page or dismiss the notice.
+
 ### Removed
 - The portable `.zip` package. The Windows installer (`.msi`) is now the only distributed
   release artifact.

@@ -37,6 +37,7 @@ import com.tailor.transcritorata.deps.DependencyChecker;
 import com.tailor.transcritorata.deps.DependencyStatus;
 import com.tailor.transcritorata.deps.ExecutableLocator;
 import com.tailor.transcritorata.deps.GpuDetector;
+import com.tailor.transcritorata.deps.UpdateChecker;
 import com.tailor.transcritorata.deps.WhisperModelOption;
 import com.tailor.transcritorata.minutes.DocxMinutesGenerator;
 import com.tailor.transcritorata.transcription.AdaptiveWhisperEngine;
@@ -99,6 +100,21 @@ public final class MainWindow {
     public void open() {
         shell.open();
         refreshDependencyState();
+        checkForUpdatesInBackground();
+    }
+
+    /**
+     * Best-effort, non-blocking check against the GitHub Releases API. Runs after the window is
+     * already open (not before, unlike {@link ModelSetupDialog#showIfNeeded}) so a slow/unavailable
+     * network never delays startup -- if a newer version turns up a little later, the dialog just
+     * pops up on top of the already-usable window.
+     */
+    private void checkForUpdatesInBackground() {
+        Thread.ofVirtual().start(() -> UpdateChecker.checkForUpdate().ifPresent(update -> display.asyncExec(() -> {
+            if (!shell.isDisposed()) {
+                UpdateAvailableDialog.show(shell, update);
+            }
+        })));
     }
 
     public boolean isDisposed() {
