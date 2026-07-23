@@ -50,8 +50,19 @@ jobs:
       - name: Run tests
         run: mvn -B -q clean test
 
-      - name: Install WiX Toolset
-        run: choco install wixtoolset --version=3.14.1 -y
+      - name: Ensure WiX Toolset is available
+        shell: pwsh
+        run: |
+          # windows-latest runners already ship a WiX Toolset 3.x install; only install one
+          # via chocolatey if that's missing (e.g. a future runner image drops it), since
+          # `choco install` errors out instead of no-op'ing when a newer version is already
+          # present without --force/--allow-downgrade.
+          $wixBin = "C:\Program Files (x86)\WiX Toolset v3.14\bin"
+          if (Test-Path "$wixBin\candle.exe") {
+            Write-Host "WiX Toolset already present at $wixBin"
+          } else {
+            choco install wixtoolset -y
+          }
 
       - name: Download ffmpeg (BtbN, LGPL shared-free build)
         shell: pwsh
