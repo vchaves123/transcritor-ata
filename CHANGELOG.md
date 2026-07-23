@@ -6,6 +6,12 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+### Security
+- The extracted VAD model file is now re-verified (SHA-256 against the bundled jar resource)
+  every time it's reused, instead of only checking it exists. Found during a security audit: a
+  stale copy corrupted on disk or altered by another process running as the same user would
+  otherwise be silently fed to whisper.cpp's native model loader without detection.
+
 ### Changed
 - Speaker clustering now uses average-linkage instead of single-linkage agglomerative
   clustering, to avoid the "chaining effect": previously, a single similar-sounding segment pair

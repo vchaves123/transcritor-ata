@@ -5,6 +5,8 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,7 +44,13 @@ final class VadModelProvider {
         }
         Path target = AppConfig.defaultConfigDir().resolve(FILE_NAME);
         try {
-            if (!Files.isRegularFile(target)) {
+            // Re-extracted not just when missing, but also when a previously-extracted copy no
+            // longer matches the jar's own resource: this file is fed to whisper-cli's native
+            // model loader (-vm), so trusting a stale file without re-checking would let disk
+            // corruption or in-place tampering by another process running as the same user go
+            // undetected. Re-verified on every resolve() (not just once ever) precisely because
+            // that kind of tampering can happen at any time after the first extraction.
+            if (!Files.isRegularFile(target) || !matchesBundledResource(target)) {
                 Files.createDirectories(target.getParent());
                 try (InputStream in = VadModelProvider.class.getResourceAsStream(RESOURCE_PATH)) {
                     if (in == null) {
@@ -59,6 +67,33 @@ final class VadModelProvider {
             LOG.warn("Could not extract the VAD model; transcription will proceed without VAD: {}", e.getMessage());
             extractionFailed = true;
             return java.util.Optional.empty();
+        }
+    }
+
+    /** @return true if {@code target}'s SHA-256 matches the bundled jar resource's. */
+    private static boolean matchesBundledResource(Path target) {
+        try (InputStream resourceIn = VadModelProvider.class.getResourceAsStream(RESOURCE_PATH);
+                InputStream targetIn = Files.newInputStream(target)) {
+            if (resourceIn == null) {
+                return false;
+            }
+            return MessageDigest.isEqual(sha256(resourceIn), sha256(targetIn));
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private static byte[] sha256(InputStream in) throws IOException {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] buffer = new byte[1 << 16];
+            int read;
+            while ((read = in.read(buffer)) != -1) {
+                digest.update(buffer, 0, read);
+            }
+            return digest.digest();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is guaranteed to be available on every JDK", e);
         }
     }
 }
