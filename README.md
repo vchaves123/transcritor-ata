@@ -209,7 +209,9 @@ by default).
 
 - Speaker identification (diarization) is optional and experimental — accuracy can vary
   considerably depending on the recording. See item 4 of the prerequisites.
-- There is no installer (`.msi`/`.exe`); distribution is via an executable jar.
+- The Windows installer (`.msi`) has no wizard UI or completion screen of its own (a limitation
+  of `jpackage`'s MSI packaging) — it installs quickly and quietly, without visual confirmation
+  beyond the Start Menu/Desktop shortcuts it creates.
 - The minutes' styles are defined in code (`DocxMinutesGenerator`), without using a corporate
   `.dotx` template — the class has already been structured for this future evolution.
 
@@ -221,3 +223,9 @@ mvn test
 
 Tests don't require ffmpeg, whisper.cpp, or models — external processes are isolated behind
 interfaces and tested with mocks/fixtures.
+
+## More documentation
+
+- [CHANGELOG.md](CHANGELOG.md) — notable changes per release.
+- [CONTRIBUTING.md](CONTRIBUTING.md) — build/test workflow and how to cut a release.
+- [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) — licenses of bundled third-party components.
