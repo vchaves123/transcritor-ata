@@ -19,7 +19,7 @@ import org.eclipse.swt.widgets.Text;
  */
 final class AboutDialog {
 
-    private static final String APP_VERSION = "1.0.5";
+    private static final String APP_VERSION = "1.0.6";
     private static final String REPO_URL = "https://github.com/vchaves123/transcritor-ata";
 
     private AboutDialog() {
