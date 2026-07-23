@@ -12,6 +12,14 @@
   <name>transcritor-ata</name>
   <description>Aplicacao desktop para transcricao de gravacoes de reunioes e geracao de atas em .docx</description>
 
+  <licenses>
+    <license>
+      <name>GNU General Public License v3.0</name>
+      <url>https://www.gnu.org/licenses/gpl-3.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

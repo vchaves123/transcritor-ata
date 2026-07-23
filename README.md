@@ -224,6 +224,10 @@ mvn test
 Tests don't require ffmpeg, whisper.cpp, or models — external processes are isolated behind
 interfaces and tested with mocks/fixtures.
 
+## License
+
+Licensed under the [GNU General Public License v3.0](LICENSE) (GPLv3).
+
 ## More documentation
 
 - [CHANGELOG.md](CHANGELOG.md) — notable changes per release.

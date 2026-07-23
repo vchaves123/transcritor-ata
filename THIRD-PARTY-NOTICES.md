@@ -1,7 +1,17 @@
 # Third-party notices
 
-transcritor-ata bundles the following third-party components. This same list is also shown
-in-app under **Help → About transcritor-ata...**.
+transcritor-ata itself is licensed under the [GPLv3](LICENSE). It bundles the following
+third-party components, under their own respective licenses. This same list is also shown in-app
+under **Help → About transcritor-ata...**.
+
+> **Note on license compatibility:** Apache POI and Jackson Databind are under the Apache License
+> 2.0, which the FSF considers compatible with GPLv3 (its patent-retaliation clause is
+> specifically what made Apache-2.0 incompatible with GPLv2). Eclipse SWT is under EPL-2.0; unlike
+> some Eclipse Foundation projects, SWT does not currently designate GPLv2-or-later as a
+> "Secondary License" under EPL-2.0's clause 2(b), so distributing it alongside GPLv3 code relies
+> on EPL-2.0 and GPLv3 both being permissive enough, as separate, non-derivative components in
+> this jar, rather than on an explicit secondary-license grant. If this matters for your use case,
+> consult your own legal counsel.
 
 ## Java libraries (bundled in the application jar)
 
