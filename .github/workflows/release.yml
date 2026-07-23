@@ -5,8 +5,11 @@ name: Release
 # "Run workflow" with an explicit version input.
 #
 # The external tools bundled into every release (ffmpeg, whisper-cli CPU/CUDA) are NOT committed
-# to this repo (see .gitignore) -- this workflow downloads them fresh from their upstream
-# releases on every run, matching the layout documented in README.md's prerequisites section.
+# to this repo (see .gitignore) -- this workflow downloads them on every run from a specific
+# pinned upstream release (not "latest"), verified against a known-good SHA-256 before use, and
+# matching the layout documented in README.md's prerequisites section. Bumping ffmpeg/whisper.cpp
+# to a newer build means deliberately updating the tag/asset/hash below, not silently absorbing
+# whatever upstream happens to publish next.
 
 on:
   push:
@@ -66,9 +69,22 @@ jobs:
 
       - name: Download ffmpeg (BtbN, LGPL shared-free build)
         shell: pwsh
+        # Pinned to a specific dated BtbN release (not the rolling "latest" tag) and verified
+        # against a known-good SHA-256, instead of trusting whatever "latest" happens to resolve
+        # to at build time: without this, a compromised upstream release would be silently
+        # absorbed into the very next transcritor-ata build and shipped to every user. Bumping
+        # this pin (tag + URL + hash together) is a deliberate, reviewable change.
+        env:
+          FFMPEG_TAG: autobuild-2026-07-23-14-16
+          FFMPEG_ASSET: ffmpeg-N-125748-g80eb9e99b9-win64-lgpl.zip
+          FFMPEG_SHA256: c1adebb39039462f7ffdbf5d99ea1491e5203160529fc176ea639ec9e36bdbce
         run: |
           $ErrorActionPreference = "Stop"
-          Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl.zip" -OutFile ffmpeg.zip
+          Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/$env:FFMPEG_TAG/$env:FFMPEG_ASSET" -OutFile ffmpeg.zip
+          $actualHash = (Get-FileHash ffmpeg.zip -Algorithm SHA256).Hash.ToLower()
+          if ($actualHash -ne $env:FFMPEG_SHA256) {
+            throw "ffmpeg download checksum mismatch (expected $env:FFMPEG_SHA256, got $actualHash) -- refusing to use it."
+          }
           Expand-Archive ffmpeg.zip -DestinationPath ffmpeg-extracted
           # The BtbN zip wraps everything in a single version-named folder; flatten it so
           # ffmpeg.exe ends up directly at tools/ffmpeg/bin/ffmpeg.exe, as the app expects.
@@ -78,16 +94,29 @@ jobs:
 
       - name: Download whisper.cpp (CPU + CUDA builds)
         shell: pwsh
+        # Pinned to a specific tagged release and verified against known-good SHA-256 hashes, for
+        # the same supply-chain reason as the ffmpeg download above.
+        env:
+          WHISPER_TAG: v1.9.1
+          WHISPER_CPU_ASSET: whisper-bin-x64.zip
+          WHISPER_CPU_SHA256: 7d8be46ecd31828e1eb7a2ecdd0d6b314feafd82163038ab6092594b0a063539
+          WHISPER_CUDA_ASSET: whisper-cublas-12.4.0-bin-x64.zip
+          WHISPER_CUDA_SHA256: 106a2030eff8998e4ef320fe72e263a78449e9040386ee27c41ea80b001b601b
         run: |
           $ErrorActionPreference = "Stop"
-          $release = Invoke-RestMethod "https://api.github.com/repos/ggml-org/whisper.cpp/releases/latest"
-          $cpuAsset = $release.assets | Where-Object { $_.name -eq "whisper-bin-x64.zip" } | Select-Object -First 1
-          $cudaAsset = $release.assets | Where-Object { $_.name -match "^whisper-cublas-.*-bin-x64\.zip$" } |
-              Sort-Object name -Descending | Select-Object -First 1
-          if (-not $cpuAsset -or -not $cudaAsset) { throw "Could not find expected whisper.cpp release assets." }
-          Write-Host "whisper.cpp $($release.tag_name): CPU=$($cpuAsset.name) CUDA=$($cudaAsset.name)"
-          Invoke-WebRequest -Uri $cpuAsset.browser_download_url -OutFile whisper-cpu.zip
-          Invoke-WebRequest -Uri $cudaAsset.browser_download_url -OutFile whisper-cuda.zip
+          $base = "https://github.com/ggml-org/whisper.cpp/releases/download/$env:WHISPER_TAG"
+          Invoke-WebRequest -Uri "$base/$env:WHISPER_CPU_ASSET" -OutFile whisper-cpu.zip
+          Invoke-WebRequest -Uri "$base/$env:WHISPER_CUDA_ASSET" -OutFile whisper-cuda.zip
+
+          $cpuHash = (Get-FileHash whisper-cpu.zip -Algorithm SHA256).Hash.ToLower()
+          if ($cpuHash -ne $env:WHISPER_CPU_SHA256) {
+            throw "whisper-cli CPU build checksum mismatch (expected $env:WHISPER_CPU_SHA256, got $cpuHash) -- refusing to use it."
+          }
+          $cudaHash = (Get-FileHash whisper-cuda.zip -Algorithm SHA256).Hash.ToLower()
+          if ($cudaHash -ne $env:WHISPER_CUDA_SHA256) {
+            throw "whisper-cli CUDA build checksum mismatch (expected $env:WHISPER_CUDA_SHA256, got $cudaHash) -- refusing to use it."
+          }
+
           # These zips already contain a "Release/" folder at their root, matching the layout
           # tools/whisper-cpu/ and tools/whisper-cuda/ are expected to have.
           Expand-Archive whisper-cpu.zip -DestinationPath tools/whisper-cpu -Force

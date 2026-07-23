@@ -15,6 +15,14 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
   of loading it into memory unbounded, and refuses to open a "Download" link whose URL isn't
   actually a `github.com/.../transcritor-ata/releases/...` link, instead of trusting whatever the
   response contained.
+- The release workflow now downloads ffmpeg and whisper.cpp from pinned upstream releases
+  verified against known-good SHA-256 hashes, instead of always fetching "latest" with no
+  integrity check. Previously, a compromised upstream release of either project would have been
+  silently bundled into the very next transcritor-ata release and shipped to every user.
+- Bumped `logback-classic` from 1.5.6 to 1.5.18 (routine dependency hygiene found during a
+  security audit; the app was never actually exploitable via the CVEs logback has had in this
+  range, since none of them apply without the optional Janino library, which this project doesn't
+  depend on).
 
 ### Changed
 - Speaker clustering now uses average-linkage instead of single-linkage agglomerative
