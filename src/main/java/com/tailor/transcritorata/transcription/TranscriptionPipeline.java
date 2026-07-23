@@ -7,10 +7,6 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import com.tailor.transcritorata.audio.AudioExtractor;
 import com.tailor.transcritorata.audio.ExternalProcessException;
 import com.tailor.transcritorata.audio.ProcessRunner;
+import com.tailor.transcritorata.diarization.DiarizationException;
 import com.tailor.transcritorata.diarization.SpeakerAttributor;
 import com.tailor.transcritorata.diarization.SpeakerDiarizer;
 import com.tailor.transcritorata.diarization.SpeakerTurn;
@@ -54,9 +51,7 @@ public final class TranscriptionPipeline {
      * @param audioListener         receives progress/log lines for the audio extraction phase (per
      *                              source file, plus the concatenation step when there's more than one)
      * @param transcriptionListener receives progress/log lines for the transcription engine
-     * @param diarizationListener   receives progress/log lines for the (optional) diarization step, kept
-     *                              separate since diarization runs concurrently with transcription and
-     *                              their raw process output would otherwise interleave in the same log
+     * @param diarizationListener   receives progress/log lines for the (optional) diarization step
      * @param minutesListener       receives progress/log lines for minutes generation (docx)
      */
     public PipelineResult run(List<Path> videoFiles, Path outputDir,
@@ -70,37 +65,17 @@ public final class TranscriptionPipeline {
         try {
             Path wav = extractAndConcatenate(videoFiles, tempDir, audioListener, handle);
 
-            // The (optional) diarization runs in parallel with the transcription: both read the same
-            // WAV, as independent processes/tasks. Its log goes to diarizationListener, not
-            // transcriptionListener, so it doesn't interleave with the transcription engine's output.
-            Future<List<SpeakerTurn>> diarizationFuture = null;
-            ExecutorService diarizationExecutor = null;
-            if (diarizationEnabled && speakerDiarizer != null) {
-                diarizationListener.onProgress("Identifying participants in parallel...", -1);
-                diarizationExecutor = Executors.newVirtualThreadPerTaskExecutor();
-                diarizationFuture = diarizationExecutor.submit(() -> {
-                    // Reported as soon as diarization itself finishes, not when attribute() runs —
-                    // that would only happen after the transcription (which runs in parallel) also
-                    // finished, leaving the phase "stuck" at In progress even though it's already done.
-                    List<SpeakerTurn> turns = speakerDiarizer.diarize(wav, handle,
-                            line -> diarizationListener.onProgress(line, -1));
-                    diarizationListener.onProgress("Participant identification complete.", 100);
-                    return turns;
-                });
-            }
-
+            // Transcription and (optional) diarization run one at a time, not concurrently: both
+            // are CPU-heavy on their own (whisper-cli requests every logical CPU for itself, and
+            // the ONNX Runtime diarization models default to using every physical core too), so
+            // running them in parallel only meant each got a smaller, unpredictable slice of the
+            // CPU instead of finishing sooner — net slower, not faster.
             transcriptionListener.onProgress("Transcribing... (this may take a few minutes)", 0);
-            List<Segment> segments;
-            try {
-                segments = engine.transcribe(wav, (msg, pct) -> transcriptionListener.onProgress(msg, pct), handle);
-            } finally {
-                if (diarizationExecutor != null) {
-                    diarizationExecutor.shutdown();
-                }
-            }
+            List<Segment> segments = engine.transcribe(wav,
+                    (msg, pct) -> transcriptionListener.onProgress(msg, pct), handle);
             transcriptionListener.onProgress("Transcription complete.", 100);
 
-            List<AttributedSegment> attributed = attribute(segments, diarizationFuture, diarizationListener);
+            List<AttributedSegment> attributed = attribute(wav, segments, handle, diarizationListener);
 
             Duration totalDuration = segments.isEmpty() ? Duration.ZERO
                     : segments.get(segments.size() - 1).end();
@@ -151,25 +126,22 @@ public final class TranscriptionPipeline {
     }
 
     /**
-     * Waits for the (optional) diarization result and attributes speakers to the transcription.
-     * A diarization failure is non-fatal: the transcription is returned without speaker labels.
+     * Runs the (optional) diarization step, after transcription has already finished, and
+     * attributes speakers to the transcription. A diarization failure is non-fatal: the
+     * transcription is returned without speaker labels.
      */
-    private List<AttributedSegment> attribute(List<Segment> segments, Future<List<SpeakerTurn>> diarizationFuture,
+    private List<AttributedSegment> attribute(Path wav, List<Segment> segments, ProcessRunner.Handle handle,
             ProgressListener listener) {
-        if (diarizationFuture == null) {
+        if (!diarizationEnabled || speakerDiarizer == null) {
             return segments.stream().map(s -> new AttributedSegment(s, null)).toList();
         }
+        listener.onProgress("Identifying participants...", -1);
         try {
-            List<SpeakerTurn> turns = diarizationFuture.get();
+            List<SpeakerTurn> turns = speakerDiarizer.diarize(wav, handle, line -> listener.onProgress(line, -1));
+            listener.onProgress("Participant identification complete.", 100);
             return SpeakerAttributor.attribute(segments, turns);
-        } catch (ExecutionException e) {
-            LOG.warn("Failed to identify participants: {}", e.getCause() == null
-                    ? e.getMessage() : e.getCause().getMessage());
-            listener.onProgress("Could not identify participants; the minutes will be generated without that information.",
-                    100);
-            return segments.stream().map(s -> new AttributedSegment(s, null)).toList();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        } catch (DiarizationException e) {
+            LOG.warn("Failed to identify participants: {}", e.getMessage());
             listener.onProgress("Could not identify participants; the minutes will be generated without that information.",
                     100);
             return segments.stream().map(s -> new AttributedSegment(s, null)).toList();
