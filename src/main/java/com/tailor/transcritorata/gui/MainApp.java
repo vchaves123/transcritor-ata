@@ -1,6 +1,7 @@
 package com.tailor.transcritorata.gui;
 
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.eclipse.swt.widgets.Display;
 
@@ -33,9 +34,11 @@ public final class MainApp {
 
         Display display = new Display();
         try {
-            AppConfig config = new AppConfig();
+            SplashScreen splash = SplashScreen.show(display);
 
-            BundledToolIntegrityChecker.verify();
+            AppConfig config = new AppConfig();
+            runIntegrityCheckWithSplash(display, splash);
+            splash.close();
 
             ExecutableLocator locator = new ExecutableLocator.Default();
             BundledFfmpegSelector.applyIfBundlePresent(config, locator);
@@ -52,6 +55,33 @@ public final class MainApp {
             }
         } finally {
             display.dispose();
+        }
+    }
+
+    /**
+     * Runs the bundled-tools integrity check (which can take a while to hash upwards of 1 GB of
+     * DLLs) on a background thread while the splash screen's progress bar tracks it, and pumps
+     * the UI thread's event loop until it's done -- keeps the splash responsive/repainting
+     * instead of freezing for the whole check, without making the check itself asynchronous with
+     * respect to the rest of startup (which still waits for it, same as before).
+     */
+    private static void runIntegrityCheckWithSplash(Display display, SplashScreen splash) {
+        AtomicBoolean done = new AtomicBoolean(false);
+        Thread.ofVirtual().start(() -> {
+            BundledToolIntegrityChecker.verify((bytesChecked, totalBytes) -> display.asyncExec(() -> {
+                if (!display.isDisposed()) {
+                    splash.setProgress("Verifying installed files...", bytesChecked, totalBytes);
+                }
+            }));
+            done.set(true);
+            if (!display.isDisposed()) {
+                display.wake();
+            }
+        });
+        while (!done.get()) {
+            if (!display.readAndDispatch()) {
+                display.sleep();
+            }
         }
     }
 }

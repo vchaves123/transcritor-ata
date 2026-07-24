@@ -6,6 +6,13 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+### Added
+- A splash screen with a progress bar now shows immediately at startup while the bundled-tools
+  integrity check runs -- this check hashes upwards of 1 GB of files (CUDA runtime DLLs are
+  several hundred MB each), which could previously leave the user staring at nothing for many
+  seconds before the main window appeared, especially on a cold disk cache. Progress is tracked
+  by bytes hashed, not file count, since a few huge files dwarf everything else combined.
+
 ### Changed
 - The sleep/hibernation check now always leaves a note: an explicit "No system sleep/hibernation
   detected during this run" when none occurred, and a summed "Total time suspended..." line
