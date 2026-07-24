@@ -6,6 +6,8 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+## [1.0.14] - 2026-07-24
+
 ### Changed
 - Sleep/hibernation notes are now attributed to the specific phase(s) whose time window actually
   overlapped the suspension, instead of copying the same note into every phase's log regardless
@@ -227,7 +229,8 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 Initial release: video-to-minutes transcription pipeline (ffmpeg + whisper.cpp), optional speaker
 identification, `.docx` minutes generation, SWT desktop GUI, and a portable Windows package.
 
-[Unreleased]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.13...HEAD
+[Unreleased]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.14...HEAD
+[1.0.14]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.13...v1.0.14
 [1.0.13]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.12...v1.0.13
 [1.0.12]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.11...v1.0.12
 [1.0.11]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.10...v1.0.11
