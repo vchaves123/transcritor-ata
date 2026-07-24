@@ -7,6 +7,11 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 ## [Unreleased]
 
 ### Added
+- Each log line in the Transcription and Speaker identification sections now starts with a
+  `[HH:mm:ss.SSS]` timestamp, so it's possible to see how long the process actually spent on each
+  line.
+
+### Added
 - "Java environment..." under Help: shows the exact JVM vendor/version, OS, CPU count, and max
   heap actually running the app, for comparing against what's expected (see CONTRIBUTING.md) when
   troubleshooting a JDK-specific issue.

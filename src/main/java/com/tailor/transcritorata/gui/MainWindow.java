@@ -3,6 +3,8 @@ package com.tailor.transcritorata.gui;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -51,6 +53,7 @@ public final class MainWindow {
 
     private static final Logger LOG = LoggerFactory.getLogger(MainWindow.class);
     private static final long DEFAULT_TIMEOUT_SECONDS = 3600;
+    private static final DateTimeFormatter LOG_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
 
     private final Display display;
     private final AppConfig config;
@@ -688,14 +691,14 @@ public final class MainWindow {
                     : message;
         }
         if (percent < 0) {
-            section.appendLog(message);
+            section.appendLog(withTimestampIfTimed(section, message));
             if (section == transcriptionSection && !currentTranscriptionAttempt.isEmpty()) {
                 section.setStatus(currentTranscriptionAttempt);
             } else {
                 section.setStatusIfWaiting("In progress...");
             }
         } else {
-            section.appendLog(message + " (" + percent + "%)");
+            section.appendLog(withTimestampIfTimed(section, message + " (" + percent + "%)"));
             if (percent >= 100) {
                 section.setStatus(message.startsWith("Could not") ? "Failed ⚠" : "Completed ✓");
                 currentTranscriptionAttempt = "";
@@ -705,6 +708,20 @@ public final class MainWindow {
                 section.setStatus("In progress (" + percent + "%)");
             }
         }
+    }
+
+    /**
+     * Prefixes {@code message} with a wall-clock timestamp for the transcription and speaker
+     * identification sections only -- these are the two phases whose per-line log output can
+     * each take anywhere from milliseconds to several minutes (a whisper.cpp segment, an ONNX
+     * diarization step), so seeing exactly when each line arrived is what makes it possible to
+     * tell how long the process actually spent on each one.
+     */
+    private String withTimestampIfTimed(CollapsibleSection section, String message) {
+        if (section != transcriptionSection && section != diarizationSection) {
+            return message;
+        }
+        return "[" + LocalTime.now().format(LOG_TIMESTAMP_FORMAT) + "] " + message;
     }
 
     private void onPipelineFailed(String friendlyMessage, String details) {
