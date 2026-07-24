@@ -6,6 +6,8 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+## [1.0.12] - 2026-07-24
+
 ### Added
 - A splash screen with a progress bar now shows immediately at startup while the bundled-tools
   integrity check runs -- this check hashes upwards of 1 GB of files (CUDA runtime DLLs are
@@ -199,7 +201,8 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 Initial release: video-to-minutes transcription pipeline (ffmpeg + whisper.cpp), optional speaker
 identification, `.docx` minutes generation, SWT desktop GUI, and a portable Windows package.
 
-[Unreleased]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.11...HEAD
+[Unreleased]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.12...HEAD
+[1.0.12]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.11...v1.0.12
 [1.0.11]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.10...v1.0.11
 [1.0.10]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.9...v1.0.10
 [1.0.9]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.8...v1.0.9
