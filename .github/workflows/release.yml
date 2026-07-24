@@ -47,7 +47,13 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "21"
+          # Pinned to an exact build, not just "21": local dev machines are set up with this
+          # same Temurin 21.0.11+10 (see CONTRIBUTING.md) so tests catch the same JDK-specific
+          # issues end users will actually hit (this project has already been bitten by one --
+          # see the -XX:TieredStopAtLevel=1 workaround in package-installer.ps1). Letting this
+          # silently drift to whatever "latest 21.x" resolves to on a future run would defeat
+          # that reproducibility.
+          java-version: "21.0.11+10"
           cache: maven
 
       - name: Run tests

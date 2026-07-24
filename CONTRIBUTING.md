@@ -6,6 +6,27 @@ Requires **JDK 21** and **Maven**. See [README.md](README.md#build-and-run) for 
 run the app, and the prerequisites section for the external tools (ffmpeg, whisper.cpp) needed to
 actually use it locally.
 
+### Use the exact same JDK the released `.msi` bundles
+
+The installed app never uses the end user's own Java (if any) -- `jpackage` bundles a private
+`jlink` runtime built from whatever JDK ran it. The release workflow builds with a specific pinned
+**Eclipse Temurin 21.0.11+10** (see `java-version` in
+[`.github/workflows/release.yml`](.github/workflows/release.yml)), so building/testing locally
+with a *different* JDK (a different vendor, like Oracle's, or even a different Temurin patch) can
+hide or introduce JDK-specific bugs that only show up for real users -- this project has already
+been bitten by one (the `-XX:TieredStopAtLevel=1` JIT workaround in
+[`package-installer.ps1`](package-installer.ps1)). To match it locally:
+
+1. Download `OpenJDK21U-jdk_x64_windows_hotspot_21.0.11_10.zip` from
+   [Adoptium's jdk-21.0.11+10 release](https://github.com/adoptium/temurin21-binaries/releases/tag/jdk-21.0.11%2B10)
+   and verify its SHA-256 against the `.sha256.txt` file on that same page.
+2. Extract it to `%USERPROFILE%\.jdks\jdk-21.0.11+10` (i.e. so
+   `%USERPROFILE%\.jdks\jdk-21.0.11+10\bin\java.exe` exists).
+3. Set `JAVA_HOME` to that path before running `mvn`/`java` for this project (e.g. in the terminal
+   you build from, or in Eclipse: Window -> Preferences -> Java -> Installed JREs -> Add..., point
+   it at that same folder, then set it as this project's JRE under Project -> Properties -> Java
+   Build Path -> Libraries).
+
 ```bash
 mvn clean package
 java -jar target/transcritor-ata.jar
