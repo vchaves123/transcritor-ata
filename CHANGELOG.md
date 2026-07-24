@@ -6,6 +6,13 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+### Changed
+- Sleep/hibernation notes are now attributed to the specific phase(s) whose time window actually
+  overlapped the suspension, instead of copying the same note into every phase's log regardless
+  of when it happened -- a suspension during transcription no longer wrongly suggests minutes
+  generation was interrupted too. The combined total across all phases is now shown next to the
+  "Elapsed time" indicator instead of repeated per-section.
+
 ### Added
 - On startup, a background sweep now removes this app's own leftover temporary files from a
   previous run that didn't shut down cleanly (crash, force-kill, power loss) -- normal shutdowns

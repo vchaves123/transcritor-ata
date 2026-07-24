@@ -4,9 +4,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import com.tailor.transcritorata.audio.AudioExtractor;
 import com.tailor.transcritorata.audio.ExternalProcessException;
 import com.tailor.transcritorata.audio.ProcessRunner;
+import com.tailor.transcritorata.deps.SleepDetector;
 import com.tailor.transcritorata.diarization.DiarizationException;
 import com.tailor.transcritorata.diarization.SpeakerAttributor;
 import com.tailor.transcritorata.diarization.SpeakerDiarizer;
@@ -53,34 +59,44 @@ public final class TranscriptionPipeline {
      * @param transcriptionListener receives progress/log lines for the transcription engine
      * @param diarizationListener   receives progress/log lines for the (optional) diarization step
      * @param minutesListener       receives progress/log lines for minutes generation (docx)
+     * @param totalSleepListener    receives the combined suspended time across every phase (zero if
+     *                              none), once the whole run ends -- regardless of how it ended
      */
     public PipelineResult run(List<Path> videoFiles, Path outputDir,
             ProgressListener audioListener, ProgressListener transcriptionListener,
             ProgressListener diarizationListener, ProgressListener minutesListener,
+            Consumer<Duration> totalSleepListener,
             ProcessRunner.Handle handle) throws ExternalProcessException, IOException, InterruptedException {
         if (videoFiles.isEmpty()) {
             throw new IllegalArgumentException("No video file selected.");
         }
         Path tempDir = Files.createTempDirectory("transcritor-ata-");
+        List<PhaseWindow> phaseWindows = new ArrayList<>();
         try {
+            Instant audioStart = Instant.now();
             Path wav = extractAndConcatenate(videoFiles, tempDir, audioListener, handle);
+            phaseWindows.add(new PhaseWindow(audioListener, audioStart, Instant.now()));
 
             // Transcription and (optional) diarization run one at a time, not concurrently: both
             // are CPU-heavy on their own (whisper-cli requests every logical CPU for itself, and
             // the ONNX Runtime diarization models default to using every physical core too), so
             // running them in parallel only meant each got a smaller, unpredictable slice of the
             // CPU instead of finishing sooner — net slower, not faster.
+            Instant transcriptionStart = Instant.now();
             Duration cpuBeforeTranscription = handle.cpuTimeUsed();
             transcriptionListener.onProgress("Transcribing... (this may take a few minutes)", 0);
             List<Segment> segments = engine.transcribe(wav,
                     (msg, pct) -> transcriptionListener.onProgress(msg, pct), handle);
             transcriptionListener.onProgress("Transcription complete.", 100);
             reportCpuTime(transcriptionListener, handle.cpuTimeUsed().minus(cpuBeforeTranscription));
+            phaseWindows.add(new PhaseWindow(transcriptionListener, transcriptionStart, Instant.now()));
 
+            Instant diarizationStart = Instant.now();
             long cpuBeforeDiarizationNanos = processCpuTimeNanos();
             List<AttributedSegment> attributed = attribute(wav, segments, handle, diarizationListener);
             if (diarizationEnabled && speakerDiarizer != null) {
                 reportCpuTime(diarizationListener, inProcessCpuDelta(cpuBeforeDiarizationNanos, processCpuTimeNanos()));
+                phaseWindows.add(new PhaseWindow(diarizationListener, diarizationStart, Instant.now()));
             }
 
             Duration totalDuration = segments.isEmpty() ? Duration.ZERO
@@ -90,17 +106,85 @@ public final class TranscriptionPipeline {
             MeetingMetadata metadata = new MeetingMetadata(LocalDate.now(), sourceFileNames(videoFiles),
                     totalDuration);
 
+            Instant minutesStart = Instant.now();
             long cpuBeforeMinutesNanos = processCpuTimeNanos();
             minutesListener.onProgress("Generating minutes...", 50);
             Path simpleMinutes = outputDir.resolve(baseName + "-minutes.docx");
             docxGenerator.generateSimpleMinutesAttributed(simpleMinutes, metadata, attributed);
             reportCpuTime(minutesListener, inProcessCpuDelta(cpuBeforeMinutesNanos, processCpuTimeNanos()));
+            phaseWindows.add(new PhaseWindow(minutesListener, minutesStart, Instant.now()));
 
             minutesListener.onProgress("Complete", 100);
             return new PipelineResult(simpleMinutes);
         } finally {
+            reportSleepIntervalsPerPhase(phaseWindows, totalSleepListener);
             deleteRecursively(tempDir);
         }
+    }
+
+    /** One phase's own wall-clock window, used to attribute a detected sleep/resume cycle to the phase it actually interrupted. */
+    private record PhaseWindow(ProgressListener listener, Instant start, Instant end) {
+    }
+
+    /**
+     * Checks Windows' own event log (see {@link SleepDetector}) for any sleep/resume cycle that
+     * happened during this run, and reports each one only to the specific phase(s) whose window it
+     * actually falls within -- not to every phase indiscriminately, since a suspension during (say)
+     * transcription didn't happen "during" minutes generation and showing it there would wrongly
+     * suggest that phase was interrupted too. Also reports the combined total across every phase via
+     * {@code totalSleepListener}, e.g. to annotate an overall elapsed-time indicator. Run regardless
+     * of how the pipeline ended (an unexplained timeout or failure is often exactly when this
+     * matters most), and never lets a query failure affect the pipeline's own outcome (already the
+     * case inside SleepDetector).
+     */
+    private static void reportSleepIntervalsPerPhase(List<PhaseWindow> phaseWindows, Consumer<Duration> totalSleepListener) {
+        if (phaseWindows.isEmpty()) {
+            return;
+        }
+        Instant earliestStart = phaseWindows.stream().map(PhaseWindow::start).min(Instant::compareTo).orElseThrow();
+        List<SleepDetector.SleepInterval> allIntervals = SleepDetector.findSleepIntervalsSince(earliestStart);
+
+        for (PhaseWindow phase : phaseWindows) {
+            List<SleepDetector.SleepInterval> overlapping = allIntervals.stream()
+                    .filter(interval -> !interval.sleepTime().isBefore(phase.start()) && interval.sleepTime().isBefore(phase.end()))
+                    .toList();
+            reportSleepForPhase(phase.listener(), overlapping);
+        }
+
+        Duration grandTotal = allIntervals.stream().map(SleepDetector.SleepInterval::duration)
+                .reduce(Duration.ZERO, Duration::plus);
+        totalSleepListener.accept(grandTotal);
+    }
+
+    private static void reportSleepForPhase(ProgressListener listener, List<SleepDetector.SleepInterval> intervals) {
+        if (intervals.isEmpty()) {
+            listener.onProgress("No system sleep/hibernation detected during this phase.", -1);
+            return;
+        }
+        ZoneId zone = ZoneId.systemDefault();
+        Duration total = Duration.ZERO;
+        for (SleepDetector.SleepInterval interval : intervals) {
+            listener.onProgress("System was suspended from " + interval.sleepTime().atZone(zone).format(CLOCK_TIME_FORMAT)
+                    + " to " + interval.wakeTime().atZone(zone).format(CLOCK_TIME_FORMAT)
+                    + " (" + formatDuration(interval.duration()) + ")", -1);
+            total = total.plus(interval.duration());
+        }
+        // Only worth a separate summary line when there's more than one occurrence to sum -- for a
+        // single occurrence it would just repeat the line above.
+        if (intervals.size() > 1) {
+            listener.onProgress("Total time suspended during this phase: " + formatDuration(total)
+                    + " across " + intervals.size() + " occurrences.", -1);
+        }
+    }
+
+    private static final DateTimeFormatter CLOCK_TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss");
+
+    private static String formatDuration(Duration duration) {
+        long totalSeconds = duration.toSeconds();
+        long hours = totalSeconds / 3600;
+        long minutes = (totalSeconds % 3600) / 60;
+        long seconds = totalSeconds % 60;
+        return hours > 0 ? "%d:%02d:%02d".formatted(hours, minutes, seconds) : "%02d:%02d".formatted(minutes, seconds);
     }
 
     /**
@@ -129,7 +213,7 @@ public final class TranscriptionPipeline {
     }
 
     private static String formatSeconds(Duration duration) {
-        return String.format(java.util.Locale.ROOT, "%.1f", duration.toNanos() / 1_000_000_000.0);
+        return String.format(Locale.ROOT, "%.1f", duration.toNanos() / 1_000_000_000.0);
     }
 
     /**

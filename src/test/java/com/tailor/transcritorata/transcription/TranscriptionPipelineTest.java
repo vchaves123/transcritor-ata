@@ -37,6 +37,7 @@ import static org.mockito.Mockito.verify;
 class TranscriptionPipelineTest {
 
     private static final ProgressListener NO_OP_LISTENER = (message, percent) -> { };
+    private static final java.util.function.Consumer<Duration> NO_OP_SLEEP_LISTENER = duration -> { };
 
     @Test
     void deletesTheTemporaryDirectoryAfterASuccessfulRun(@TempDir Path outputDir) throws Exception {
@@ -51,7 +52,7 @@ class TranscriptionPipelineTest {
         TranscriptionPipeline pipeline = new TranscriptionPipeline(audioExtractor, engine, docxGenerator, null, false);
 
         List<Path> videos = List.of(Path.of("a.mp4"), Path.of("b.mp4"));
-        pipeline.run(videos, outputDir, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER,
+        pipeline.run(videos, outputDir, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_SLEEP_LISTENER,
                 new ProcessRunner.Handle());
 
         Path tempDir = wavCaptor.getValue().getParent();
@@ -72,7 +73,7 @@ class TranscriptionPipelineTest {
         List<Path> videos = List.of(Path.of("a.mp4"), Path.of("b.mp4"));
 
         assertThrows(ExternalProcessException.class, () -> pipeline.run(videos, outputDir, NO_OP_LISTENER,
-                NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, new ProcessRunner.Handle()));
+                NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_SLEEP_LISTENER, new ProcessRunner.Handle()));
 
         Path tempDir = wavCaptor.getValue().getParent();
         assertFalse(Files.exists(tempDir), "the per-run temp directory must be cleaned up even after a failure");
@@ -90,7 +91,7 @@ class TranscriptionPipelineTest {
         List<Path> videos = List.of(Path.of("a.mp4"), Path.of("b.mp4"));
 
         assertThrows(ProcessCancelledException.class, () -> pipeline.run(videos, outputDir, NO_OP_LISTENER,
-                NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, new ProcessRunner.Handle()));
+                NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_SLEEP_LISTENER, new ProcessRunner.Handle()));
     }
 
     @Test
@@ -109,7 +110,7 @@ class TranscriptionPipelineTest {
         TranscriptionPipeline pipeline = new TranscriptionPipeline(audioExtractor, engine, docxGenerator, diarizer, true);
         List<Path> videos = List.of(Path.of("a.mp4"), Path.of("b.mp4"));
 
-        pipeline.run(videos, outputDir, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER,
+        pipeline.run(videos, outputDir, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_SLEEP_LISTENER,
                 new ProcessRunner.Handle());
 
         verify(docxGenerator).generateSimpleMinutesAttributed(any(Path.class), any(MeetingMetadata.class),

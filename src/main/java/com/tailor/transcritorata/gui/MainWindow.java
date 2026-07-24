@@ -3,7 +3,6 @@ package com.tailor.transcritorata.gui;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -40,7 +39,6 @@ import com.tailor.transcritorata.deps.DependencyChecker;
 import com.tailor.transcritorata.deps.DependencyStatus;
 import com.tailor.transcritorata.deps.ExecutableLocator;
 import com.tailor.transcritorata.deps.GpuDetector;
-import com.tailor.transcritorata.deps.SleepDetector;
 import com.tailor.transcritorata.deps.UpdateChecker;
 import com.tailor.transcritorata.deps.WhisperModelOption;
 import com.tailor.transcritorata.minutes.DocxMinutesGenerator;
@@ -56,7 +54,6 @@ public final class MainWindow {
     private static final Logger LOG = LoggerFactory.getLogger(MainWindow.class);
     private static final long DEFAULT_TIMEOUT_SECONDS = 3600;
     private static final DateTimeFormatter LOG_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
-    private static final DateTimeFormatter CLOCK_TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private final Display display;
     private final AppConfig config;
@@ -636,7 +633,6 @@ public final class MainWindow {
     }
 
     private void runPipeline(ProcessRunner.Handle handle, List<Path> videos, boolean diarizationEnabled) {
-        Instant pipelineStart = Instant.now();
         try {
             TranscriptionPipeline pipeline = buildPipeline(diarizationEnabled);
             Path outputDir = resolveOutputDir(videos);
@@ -651,6 +647,7 @@ public final class MainWindow {
                             .asyncExec(() -> reportPhaseProgress(diarizationSection, message, percent)),
                     (message, percent) -> display
                             .asyncExec(() -> reportPhaseProgress(minutesSection, message, percent)),
+                    totalSuspended -> display.asyncExec(() -> reportTotalSuspended(totalSuspended)),
                     handle);
 
             display.asyncExec(() -> {
@@ -679,53 +676,25 @@ public final class MainWindow {
             LOG.error("Unexpected failure during transcription", e);
             display.asyncExec(() -> onPipelineFailed(
                     "An unexpected problem occurred during transcription: " + e.getMessage(), ""));
-        } finally {
-            reportSleepIntervals(pipelineStart);
         }
     }
 
     /**
-     * Checks Windows' own event log for any sleep/resume cycle that happened during this run
-     * (see {@link SleepDetector}) and appends a note to every phase's log either way -- run
-     * regardless of how the pipeline ended, since an unexplained timeout or failure is often
-     * exactly when this matters most. Best-effort: any failure to query the event log is already
-     * swallowed inside SleepDetector, so this never affects the pipeline's own outcome.
+     * Appends the combined sleep/hibernation total (across every phase, see
+     * {@link TranscriptionPipeline}) to the elapsed-time indicator, since that figure's own
+     * wall-clock value already includes any such suspended time and would otherwise look like the
+     * run itself took that long. Skipped entirely when there was none, to avoid cluttering the
+     * common case.
      */
-    private void reportSleepIntervals(Instant pipelineStart) {
-        List<SleepDetector.SleepInterval> intervals = SleepDetector.findSleepIntervalsSince(pipelineStart);
-        display.asyncExec(() -> {
-            if (shell.isDisposed()) {
-                return;
-            }
-            if (intervals.isEmpty()) {
-                appendToAllSections(
-                        "[" + LocalTime.now().format(LOG_TIMESTAMP_FORMAT) + "] No system sleep/hibernation detected during this run.");
-                return;
-            }
-            java.time.ZoneId zone = java.time.ZoneId.systemDefault();
-            Duration total = Duration.ZERO;
-            for (SleepDetector.SleepInterval interval : intervals) {
-                String note = "[" + LocalTime.now().format(LOG_TIMESTAMP_FORMAT) + "] System was suspended from "
-                        + interval.sleepTime().atZone(zone).format(CLOCK_TIME_FORMAT) + " to "
-                        + interval.wakeTime().atZone(zone).format(CLOCK_TIME_FORMAT)
-                        + " (" + formatDuration(interval.duration()) + ")";
-                appendToAllSections(note);
-                total = total.plus(interval.duration());
-            }
-            // Only worth a separate summary line when there's more than one occurrence to sum --
-            // for a single occurrence it would just repeat the line above.
-            if (intervals.size() > 1) {
-                appendToAllSections("[" + LocalTime.now().format(LOG_TIMESTAMP_FORMAT) + "] Total time suspended during this run: "
-                        + formatDuration(total) + " across " + intervals.size() + " occurrences.");
-            }
-        });
-    }
-
-    private void appendToAllSections(String line) {
-        audioSection.appendLog(line);
-        transcriptionSection.appendLog(line);
-        diarizationSection.appendLog(line);
-        minutesSection.appendLog(line);
+    private void reportTotalSuspended(Duration totalSuspended) {
+        if (shell.isDisposed() || totalSuspended.isZero()) {
+            return;
+        }
+        // Stops the ticking timer (if it hasn't already) before touching the label: this can run
+        // before setControlsEnabledWhileBusy(false) does (both are scheduled via asyncExec from
+        // different places), and the next tick would otherwise overwrite this text right after.
+        stopElapsedTimer();
+        setElapsedTimeLabelText(elapsedTimeLabel.getText() + " (suspended: " + formatDuration(totalSuspended) + ")");
     }
 
     private void reportPhaseProgress(CollapsibleSection section, String message, int percent) {
@@ -762,13 +731,16 @@ public final class MainWindow {
 
     /**
      * Prefixes {@code message} with a wall-clock timestamp for the transcription and speaker
-     * identification sections only -- these are the two phases whose per-line log output can
-     * each take anywhere from milliseconds to several minutes (a whisper.cpp segment, an ONNX
-     * diarization step), so seeing exactly when each line arrived is what makes it possible to
-     * tell how long the process actually spent on each one.
+     * identification sections (these are the two phases whose per-line log output can each take
+     * anywhere from milliseconds to several minutes -- a whisper.cpp segment, an ONNX diarization
+     * step -- so seeing exactly when each line arrived is what makes it possible to tell how long
+     * the process actually spent on each one), and for sleep/hibernation notes in any section
+     * (see {@link TranscriptionPipeline}), since those are inherently about wall-clock timing.
      */
     private String withTimestampIfTimed(CollapsibleSection section, String message) {
-        if (section != transcriptionSection && section != diarizationSection) {
+        boolean isSleepNote = message.startsWith("System was suspended") || message.startsWith("No system sleep/hibernation")
+                || message.startsWith("Total time suspended");
+        if (section != transcriptionSection && section != diarizationSection && !isSleepNote) {
             return message;
         }
         return "[" + LocalTime.now().format(LOG_TIMESTAMP_FORMAT) + "] " + message;
