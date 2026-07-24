@@ -38,6 +38,11 @@ public final class ProcessRunner {
     public static final class Handle {
         private final AtomicReference<Process> processRef = new AtomicReference<>();
         private volatile boolean cancelled;
+        // Accumulates across every run() call sharing this Handle (e.g. one ffmpeg invocation per
+        // source video, or several whisper-cli attempts on GPU-out-of-memory retries), so callers
+        // can snapshot this before/after a phase and diff it to get that phase's own CPU time.
+        private final AtomicReference<java.time.Duration> cpuTimeUsed =
+                new AtomicReference<>(java.time.Duration.ZERO);
 
         public void cancel() {
             cancelled = true;
@@ -50,6 +55,15 @@ public final class ProcessRunner {
 
         public boolean isCancelled() {
             return cancelled;
+        }
+
+        /** @return total CPU time used by every process run so far through this Handle. */
+        public java.time.Duration cpuTimeUsed() {
+            return cpuTimeUsed.get();
+        }
+
+        private void addCpuTime(java.time.Duration duration) {
+            cpuTimeUsed.updateAndGet(existing -> existing.plus(duration));
         }
     }
 
@@ -108,6 +122,10 @@ public final class ProcessRunner {
             }
 
             boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+            // Recorded regardless of outcome (success, cancelled, timed out, non-zero exit): even
+            // a failed/killed run consumed real CPU time worth accounting for. The OS keeps this
+            // available via the still-open process handle even after the process has exited.
+            handle.addCpuTime(process.toHandle().info().totalCpuDuration().orElse(java.time.Duration.ZERO));
 
             // Checked before inspecting the exit code: a forcibly-killed process almost always
             // exits with a non-zero code, which would otherwise be reported as a generic failure

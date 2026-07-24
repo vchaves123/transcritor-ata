@@ -70,12 +70,18 @@ public final class TranscriptionPipeline {
             // the ONNX Runtime diarization models default to using every physical core too), so
             // running them in parallel only meant each got a smaller, unpredictable slice of the
             // CPU instead of finishing sooner — net slower, not faster.
+            Duration cpuBeforeTranscription = handle.cpuTimeUsed();
             transcriptionListener.onProgress("Transcribing... (this may take a few minutes)", 0);
             List<Segment> segments = engine.transcribe(wav,
                     (msg, pct) -> transcriptionListener.onProgress(msg, pct), handle);
             transcriptionListener.onProgress("Transcription complete.", 100);
+            reportCpuTime(transcriptionListener, handle.cpuTimeUsed().minus(cpuBeforeTranscription));
 
+            long cpuBeforeDiarizationNanos = processCpuTimeNanos();
             List<AttributedSegment> attributed = attribute(wav, segments, handle, diarizationListener);
+            if (diarizationEnabled && speakerDiarizer != null) {
+                reportCpuTime(diarizationListener, inProcessCpuDelta(cpuBeforeDiarizationNanos, processCpuTimeNanos()));
+            }
 
             Duration totalDuration = segments.isEmpty() ? Duration.ZERO
                     : segments.get(segments.size() - 1).end();
@@ -84,9 +90,11 @@ public final class TranscriptionPipeline {
             MeetingMetadata metadata = new MeetingMetadata(LocalDate.now(), sourceFileNames(videoFiles),
                     totalDuration);
 
+            long cpuBeforeMinutesNanos = processCpuTimeNanos();
             minutesListener.onProgress("Generating minutes...", 50);
             Path simpleMinutes = outputDir.resolve(baseName + "-minutes.docx");
             docxGenerator.generateSimpleMinutesAttributed(simpleMinutes, metadata, attributed);
+            reportCpuTime(minutesListener, inProcessCpuDelta(cpuBeforeMinutesNanos, processCpuTimeNanos()));
 
             minutesListener.onProgress("Complete", 100);
             return new PipelineResult(simpleMinutes);
@@ -96,12 +104,42 @@ public final class TranscriptionPipeline {
     }
 
     /**
+     * @return the JVM process's total CPU time in nanoseconds since it started, or -1 if the
+     *         platform doesn't support this measurement.
+     */
+    private static long processCpuTimeNanos() {
+        var osBean = java.lang.management.ManagementFactory.getOperatingSystemMXBean();
+        return osBean instanceof com.sun.management.OperatingSystemMXBean sunBean ? sunBean.getProcessCpuTime() : -1;
+    }
+
+    /** @return the CPU time delta, or a negative sentinel duration if either snapshot was unsupported. */
+    private static Duration inProcessCpuDelta(long beforeNanos, long afterNanos) {
+        if (beforeNanos < 0 || afterNanos < 0) {
+            return Duration.ofNanos(-1);
+        }
+        return Duration.ofNanos(Math.max(0, afterNanos - beforeNanos));
+    }
+
+    /** Reports {@code cpuTime} as a log-only line, unless the measurement was unavailable (negative). */
+    private static void reportCpuTime(ProgressListener listener, Duration cpuTime) {
+        if (cpuTime.isNegative()) {
+            return;
+        }
+        listener.onProgress("CPU time: " + formatSeconds(cpuTime) + "s", -1);
+    }
+
+    private static String formatSeconds(Duration duration) {
+        return String.format(java.util.Locale.ROOT, "%.1f", duration.toNanos() / 1_000_000_000.0);
+    }
+
+    /**
      * Extracts audio from each source file (in order) and, when there's more than one, concatenates
      * them into a single WAV — the transcription/diarization stages downstream only ever see one
      * combined recording.
      */
     private Path extractAndConcatenate(List<Path> videoFiles, Path tempDir, ProgressListener audioListener,
             ProcessRunner.Handle handle) throws ExternalProcessException, IOException {
+        Duration cpuBeforeExtraction = handle.cpuTimeUsed();
         List<Path> extractedWavs = new ArrayList<>(videoFiles.size());
         for (int i = 0; i < videoFiles.size(); i++) {
             Path videoFile = videoFiles.get(i);
@@ -122,6 +160,7 @@ public final class TranscriptionPipeline {
             Files.move(extractedWavs.get(0), combined, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
         audioListener.onProgress("Audio extraction complete.", 100);
+        reportCpuTime(audioListener, handle.cpuTimeUsed().minus(cpuBeforeExtraction));
         return combined;
     }
 

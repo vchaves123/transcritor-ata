@@ -3,6 +3,7 @@ package com.tailor.transcritorata.gui;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -39,6 +40,7 @@ import com.tailor.transcritorata.deps.DependencyChecker;
 import com.tailor.transcritorata.deps.DependencyStatus;
 import com.tailor.transcritorata.deps.ExecutableLocator;
 import com.tailor.transcritorata.deps.GpuDetector;
+import com.tailor.transcritorata.deps.SleepDetector;
 import com.tailor.transcritorata.deps.UpdateChecker;
 import com.tailor.transcritorata.deps.WhisperModelOption;
 import com.tailor.transcritorata.minutes.DocxMinutesGenerator;
@@ -54,6 +56,7 @@ public final class MainWindow {
     private static final Logger LOG = LoggerFactory.getLogger(MainWindow.class);
     private static final long DEFAULT_TIMEOUT_SECONDS = 3600;
     private static final DateTimeFormatter LOG_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
+    private static final DateTimeFormatter CLOCK_TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private final Display display;
     private final AppConfig config;
@@ -633,6 +636,7 @@ public final class MainWindow {
     }
 
     private void runPipeline(ProcessRunner.Handle handle, List<Path> videos, boolean diarizationEnabled) {
+        Instant pipelineStart = Instant.now();
         try {
             TranscriptionPipeline pipeline = buildPipeline(diarizationEnabled);
             Path outputDir = resolveOutputDir(videos);
@@ -675,7 +679,39 @@ public final class MainWindow {
             LOG.error("Unexpected failure during transcription", e);
             display.asyncExec(() -> onPipelineFailed(
                     "An unexpected problem occurred during transcription: " + e.getMessage(), ""));
+        } finally {
+            reportSleepIntervals(pipelineStart);
         }
+    }
+
+    /**
+     * Checks Windows' own event log for any sleep/resume cycle that happened during this run
+     * (see {@link SleepDetector}) and, if found, appends a note to every phase's log -- run
+     * regardless of how the pipeline ended, since an unexplained timeout or failure is often
+     * exactly when this matters most. Best-effort: any failure to query the event log is already
+     * swallowed inside SleepDetector, so this never affects the pipeline's own outcome.
+     */
+    private void reportSleepIntervals(Instant pipelineStart) {
+        List<SleepDetector.SleepInterval> intervals = SleepDetector.findSleepIntervalsSince(pipelineStart);
+        if (intervals.isEmpty()) {
+            return;
+        }
+        display.asyncExec(() -> {
+            if (shell.isDisposed()) {
+                return;
+            }
+            java.time.ZoneId zone = java.time.ZoneId.systemDefault();
+            for (SleepDetector.SleepInterval interval : intervals) {
+                String note = "[" + LocalTime.now().format(LOG_TIMESTAMP_FORMAT) + "] System was suspended from "
+                        + interval.sleepTime().atZone(zone).format(CLOCK_TIME_FORMAT) + " to "
+                        + interval.wakeTime().atZone(zone).format(CLOCK_TIME_FORMAT)
+                        + " (" + formatDuration(interval.duration()) + ")";
+                audioSection.appendLog(note);
+                transcriptionSection.appendLog(note);
+                diarizationSection.appendLog(note);
+                minutesSection.appendLog(note);
+            }
+        });
     }
 
     private void reportPhaseProgress(CollapsibleSection section, String message, int percent) {

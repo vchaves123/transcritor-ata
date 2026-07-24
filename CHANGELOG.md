@@ -7,6 +7,14 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 ## [Unreleased]
 
 ### Added
+- Every phase now logs how much CPU time it actually used (e.g. `CPU time: 12.3s`) when it
+  finishes -- external tools (ffmpeg, whisper-cli) via their own process accounting, in-process
+  work (speaker identification, minutes generation) via the JVM's own CPU time.
+- If the machine was suspended (sleep/hibernate) at any point during a run, a note with the exact
+  suspend/resume times and duration is appended to every phase's log, sourced from Windows' own
+  System event log (no guessing).
+
+### Added
 - Each log line in the Transcription and Speaker identification sections now starts with a
   `[HH:mm:ss.SSS]` timestamp, so it's possible to see how long the process actually spent on each
   line.
