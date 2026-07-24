@@ -24,24 +24,28 @@ final class UpdateAvailableDialog {
         Shell dialog = new Shell(parent, SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
         AppIcon.apply(dialog);
         dialog.setText("Update available");
-        dialog.setLayout(new GridLayout(1, false));
+        GridLayout dialogLayout = new GridLayout(1, false);
+        dialogLayout.marginWidth = 16;
+        dialogLayout.marginHeight = 16;
+        dialogLayout.verticalSpacing = 12;
+        dialog.setLayout(dialogLayout);
 
         Label message = new Label(dialog, SWT.WRAP);
         message.setText("A new version of transcritor-ata is available: " + update.version()
                 + " (you have " + AppVersion.CURRENT + ").");
         GridData messageData = new GridData(SWT.FILL, SWT.CENTER, true, false);
-        messageData.widthHint = 340;
+        messageData.widthHint = 380;
         message.setLayoutData(messageData);
 
         Composite buttons = new Composite(dialog, SWT.NONE);
         GridLayout buttonsLayout = new GridLayout(2, false);
+        buttonsLayout.horizontalSpacing = 10;
         buttons.setLayout(buttonsLayout);
-        GridData buttonsData = new GridData(SWT.END, SWT.CENTER, true, false);
-        buttonsData.verticalIndent = 12;
-        buttons.setLayoutData(buttonsData);
+        buttons.setLayoutData(new GridData(SWT.END, SWT.CENTER, true, false));
 
         Button ignore = new Button(buttons, SWT.PUSH);
         ignore.setText("Ignore");
+        ignore.setLayoutData(new GridData(90, SWT.DEFAULT));
         ignore.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
@@ -51,6 +55,7 @@ final class UpdateAvailableDialog {
 
         Button download = new Button(buttons, SWT.PUSH);
         download.setText("Download");
+        download.setLayoutData(new GridData(90, SWT.DEFAULT));
         download.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
