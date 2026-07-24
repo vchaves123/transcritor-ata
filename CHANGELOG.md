@@ -6,6 +6,13 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+### Fixed
+- Sleep/hibernation detection missed Modern Standby (S0ix), the suspend mechanism most laptops
+  use by default when the lid is closed -- it only queried the classic-sleep event source, so a
+  run interrupted by closing the lid was silently reported as "no sleep detected". Now also
+  queries Windows' Modern Standby events and the lower-level classic-sleep events, merging
+  overlapping/duplicate reports from different sources into one.
+
 ## [1.0.12] - 2026-07-24
 
 ### Added
