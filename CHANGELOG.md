@@ -6,6 +6,15 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+### Added
+- "Java environment..." under Help: shows the exact JVM vendor/version, OS, CPU count, and max
+  heap actually running the app, for comparing against what's expected (see CONTRIBUTING.md) when
+  troubleshooting a JDK-specific issue.
+
+### Fixed
+- The About dialog's third-party notices listed an outdated Logback version (1.5.6 instead of the
+  1.5.18 the app actually ships).
+
 ## [1.0.10] - 2026-07-23
 
 ### Security

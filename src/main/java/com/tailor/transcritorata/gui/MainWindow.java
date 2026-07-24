@@ -332,6 +332,15 @@ public final class MainWindow {
             }
         });
 
+        MenuItem javaEnvironment = new MenuItem(helpMenu, SWT.PUSH);
+        javaEnvironment.setText("Java environment...");
+        javaEnvironment.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                JavaEnvironmentDialog.show(shell);
+            }
+        });
+
         new MenuItem(helpMenu, SWT.SEPARATOR);
 
         MenuItem about = new MenuItem(helpMenu, SWT.PUSH);

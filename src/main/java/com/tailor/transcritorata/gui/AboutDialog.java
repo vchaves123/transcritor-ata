@@ -121,7 +121,7 @@ final class AboutDialog {
               MIT License
               https://www.slf4j.org/license.html
 
-            Logback Classic (ch.qos.logback:logback-classic) 1.5.6
+            Logback Classic (ch.qos.logback:logback-classic) 1.5.18
               Eclipse Public License 1.0 / GNU LGPL 2.1 (dual-licensed)
               https://logback.qos.ch/license.html
 
