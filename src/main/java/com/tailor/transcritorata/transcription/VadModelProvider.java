@@ -57,8 +57,15 @@ final class VadModelProvider {
                         throw new IOException("Resource not found on classpath: " + RESOURCE_PATH);
                     }
                     Path tempFile = Files.createTempFile(target.getParent(), FILE_NAME, ".tmp");
-                    Files.copy(in, tempFile, StandardCopyOption.REPLACE_EXISTING);
-                    Files.move(tempFile, target, StandardCopyOption.REPLACE_EXISTING);
+                    try {
+                        Files.copy(in, tempFile, StandardCopyOption.REPLACE_EXISTING);
+                        Files.move(tempFile, target, StandardCopyOption.REPLACE_EXISTING);
+                    } finally {
+                        // If copy() failed partway (e.g. disk full), the move above never ran and
+                        // this staging file would otherwise be left behind in %APPDATA% forever --
+                        // nothing else ever revisits or cleans up this exact random-named file.
+                        Files.deleteIfExists(tempFile);
+                    }
                 }
             }
             extractedModelPath = target;

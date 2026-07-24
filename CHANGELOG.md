@@ -6,6 +6,16 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+### Added
+- On startup, a background sweep now removes this app's own leftover temporary files from a
+  previous run that didn't shut down cleanly (crash, force-kill, power loss) -- normal shutdowns
+  already clean these up immediately, so this is only a backstop, and only ever touches entries
+  clearly old enough (24h+) that a still-running instance couldn't be using them.
+
+### Fixed
+- The VAD model extraction's staging `.tmp` file was never cleaned up if the copy failed partway
+  (e.g. disk full), leaving it behind in `%APPDATA%\transcritor-ata\` forever.
+
 ## [1.0.13] - 2026-07-24
 
 ### Fixed

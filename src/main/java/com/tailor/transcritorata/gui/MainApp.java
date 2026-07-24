@@ -10,6 +10,7 @@ import com.tailor.transcritorata.deps.BundledFfmpegSelector;
 import com.tailor.transcritorata.deps.BundledToolIntegrityChecker;
 import com.tailor.transcritorata.deps.ExecutableLocator;
 import com.tailor.transcritorata.deps.GpuDetector;
+import com.tailor.transcritorata.deps.StaleTempFileCleaner;
 import com.tailor.transcritorata.deps.WhisperVariantSelector;
 
 /**
@@ -47,6 +48,10 @@ public final class MainApp {
 
             MainWindow window = new MainWindow(display, config);
             window.open();
+
+            // Best-effort backstop for temp files left behind by a previous run that didn't shut
+            // down cleanly (crash, force-kill); never awaited, must never delay startup.
+            Thread.ofVirtual().start(StaleTempFileCleaner::cleanup);
 
             while (!window.isDisposed()) {
                 if (!display.readAndDispatch()) {
