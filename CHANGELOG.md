@@ -6,6 +6,8 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+## [1.0.11] - 2026-07-24
+
 ### Added
 - Every phase now logs how much CPU time it actually used (e.g. `CPU time: 12.3s`) when it
   finishes -- external tools (ffmpeg, whisper-cli) via their own process accounting, in-process
@@ -13,13 +15,9 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 - If the machine was suspended (sleep/hibernate) at any point during a run, a note with the exact
   suspend/resume times and duration is appended to every phase's log, sourced from Windows' own
   System event log (no guessing).
-
-### Added
 - Each log line in the Transcription and Speaker identification sections now starts with a
   `[HH:mm:ss.SSS]` timestamp, so it's possible to see how long the process actually spent on each
   line.
-
-### Added
 - "Java environment..." under Help: shows the exact JVM vendor/version, OS, CPU count, and max
   heap actually running the app, for comparing against what's expected (see CONTRIBUTING.md) when
   troubleshooting a JDK-specific issue.
@@ -189,7 +187,8 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 Initial release: video-to-minutes transcription pipeline (ffmpeg + whisper.cpp), optional speaker
 identification, `.docx` minutes generation, SWT desktop GUI, and a portable Windows package.
 
-[Unreleased]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.10...HEAD
+[Unreleased]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.11...HEAD
+[1.0.11]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.10...v1.0.11
 [1.0.10]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.9...v1.0.10
 [1.0.9]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.8...v1.0.9
 [1.0.8]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.7...v1.0.8
