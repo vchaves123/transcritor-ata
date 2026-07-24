@@ -6,6 +6,11 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+### Changed
+- The sleep/hibernation check now always leaves a note: an explicit "No system sleep/hibernation
+  detected during this run" when none occurred, and a summed "Total time suspended..." line
+  (in addition to each individual occurrence) when the machine suspended more than once.
+
 ## [1.0.11] - 2026-07-24
 
 ### Added

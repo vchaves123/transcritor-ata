@@ -686,32 +686,46 @@ public final class MainWindow {
 
     /**
      * Checks Windows' own event log for any sleep/resume cycle that happened during this run
-     * (see {@link SleepDetector}) and, if found, appends a note to every phase's log -- run
+     * (see {@link SleepDetector}) and appends a note to every phase's log either way -- run
      * regardless of how the pipeline ended, since an unexplained timeout or failure is often
      * exactly when this matters most. Best-effort: any failure to query the event log is already
      * swallowed inside SleepDetector, so this never affects the pipeline's own outcome.
      */
     private void reportSleepIntervals(Instant pipelineStart) {
         List<SleepDetector.SleepInterval> intervals = SleepDetector.findSleepIntervalsSince(pipelineStart);
-        if (intervals.isEmpty()) {
-            return;
-        }
         display.asyncExec(() -> {
             if (shell.isDisposed()) {
                 return;
             }
+            if (intervals.isEmpty()) {
+                appendToAllSections(
+                        "[" + LocalTime.now().format(LOG_TIMESTAMP_FORMAT) + "] No system sleep/hibernation detected during this run.");
+                return;
+            }
             java.time.ZoneId zone = java.time.ZoneId.systemDefault();
+            Duration total = Duration.ZERO;
             for (SleepDetector.SleepInterval interval : intervals) {
                 String note = "[" + LocalTime.now().format(LOG_TIMESTAMP_FORMAT) + "] System was suspended from "
                         + interval.sleepTime().atZone(zone).format(CLOCK_TIME_FORMAT) + " to "
                         + interval.wakeTime().atZone(zone).format(CLOCK_TIME_FORMAT)
                         + " (" + formatDuration(interval.duration()) + ")";
-                audioSection.appendLog(note);
-                transcriptionSection.appendLog(note);
-                diarizationSection.appendLog(note);
-                minutesSection.appendLog(note);
+                appendToAllSections(note);
+                total = total.plus(interval.duration());
+            }
+            // Only worth a separate summary line when there's more than one occurrence to sum --
+            // for a single occurrence it would just repeat the line above.
+            if (intervals.size() > 1) {
+                appendToAllSections("[" + LocalTime.now().format(LOG_TIMESTAMP_FORMAT) + "] Total time suspended during this run: "
+                        + formatDuration(total) + " across " + intervals.size() + " occurrences.");
             }
         });
+    }
+
+    private void appendToAllSections(String line) {
+        audioSection.appendLog(line);
+        transcriptionSection.appendLog(line);
+        diarizationSection.appendLog(line);
+        minutesSection.appendLog(line);
     }
 
     private void reportPhaseProgress(CollapsibleSection section, String message, int percent) {
