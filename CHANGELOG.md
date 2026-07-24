@@ -6,6 +6,8 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+## [1.0.13] - 2026-07-24
+
 ### Fixed
 - Sleep/hibernation detection missed Modern Standby (S0ix), the suspend mechanism most laptops
   use by default when the lid is closed -- it only queried the classic-sleep event source, so a
@@ -208,7 +210,8 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 Initial release: video-to-minutes transcription pipeline (ffmpeg + whisper.cpp), optional speaker
 identification, `.docx` minutes generation, SWT desktop GUI, and a portable Windows package.
 
-[Unreleased]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.12...HEAD
+[Unreleased]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.13...HEAD
+[1.0.13]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.12...v1.0.13
 [1.0.12]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.11...v1.0.12
 [1.0.11]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.10...v1.0.11
 [1.0.10]: https://github.com/vchaves123/transcritor-ata/compare/v1.0.9...v1.0.10
