@@ -159,6 +159,13 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.3.1</version>
+        <configuration>
+          <!-- Matches the -XX:TieredStopAtLevel=1 that package-installer.ps1 bakes into the
+               released .msi (a workaround for a C2 JIT crash on newer Intel hybrid CPUs), so
+               tests run under the same JIT configuration real users actually get instead of the
+               JVM's full default tiered compilation. -->
+          <argLine>-XX:TieredStopAtLevel=1</argLine>
+        </configuration>
       </plugin>
 
       <plugin>

@@ -27,10 +27,22 @@ been bitten by one (the `-XX:TieredStopAtLevel=1` JIT workaround in
    it at that same folder, then set it as this project's JRE under Project -> Properties -> Java
    Build Path -> Libraries).
 
+### Also match the released `.msi`'s JIT configuration
+
+`package-installer.ps1` launches the app with `-XX:TieredStopAtLevel=1` (disables the C2 JIT
+compiler, keeping only C1) -- the workaround mentioned above. `mvn test` already passes this to
+every test run (see the `maven-surefire-plugin` config in `pom.xml`), but running the jar directly
+does not unless you pass it yourself:
+
 ```bash
 mvn clean package
-java -jar target/transcritor-ata.jar
+java -XX:TieredStopAtLevel=1 -jar target/transcritor-ata.jar
 ```
+
+In Eclipse, add `-XX:TieredStopAtLevel=1` under the launch configuration's **Arguments** tab, VM
+arguments box (Run -> Run Configurations... -> your launch config for `MainApp`), so runs from the
+IDE match too -- without it, the app runs under the JVM's full default tiered compilation (C1+C2)
+instead of what real users actually get.
 
 ## Running tests
 
