@@ -20,18 +20,22 @@ import org.slf4j.LoggerFactory;
 import com.tailor.transcritorata.config.AppConfig;
 import com.tailor.transcritorata.deps.AppHome;
 import com.tailor.transcritorata.deps.ExecutableLocator;
+import com.tailor.transcritorata.deps.GpuDetector;
 import com.tailor.transcritorata.deps.WhisperModelDownloader;
 import com.tailor.transcritorata.deps.WhisperModelOption;
 import com.tailor.transcritorata.deps.WhisperModelSetupChecker;
 
 /**
  * Dialog offering to download a Whisper model, so the user doesn't have to hunt for a download
- * link and manually edit preferences. Used in two places:
+ * link and manually edit preferences. Only the two models that came out ahead in benchmarking are
+ * offered -- see {@link WhisperModelOption} -- with the one matching this machine's hardware
+ * ({@link WhisperModelOption#recommendedFor}) pre-selected, but the user can pick either. Used in
+ * two places:
  * <ul>
  *   <li>{@link #showIfNeeded} — on startup, only when {@link WhisperModelSetupChecker} reports
  *       no valid model is configured.</li>
- *   <li>{@link #show} — from Preferences, any time the user wants to switch to a different
- *       model (e.g. a smaller one, after hitting a GPU out-of-memory error with a larger one).</li>
+ *   <li>{@link #show} — from Preferences, any time the user wants to switch to the other
+ *       model.</li>
  * </ul>
  */
 final class ModelSetupDialog {
@@ -48,29 +52,31 @@ final class ModelSetupDialog {
         if (!WhisperModelSetupChecker.isNeeded(config, locator)) {
             return;
         }
+        WhisperModelOption recommended = WhisperModelOption.recommendedFor(new GpuDetector(locator).hasNvidiaGpu());
         Shell dialog = new Shell(display, SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
         AppIcon.apply(dialog);
-        open(dialog, display, config, "Initial setup — transcription model",
+        open(dialog, display, config, recommended, "Initial setup — transcription model",
                 "transcritor-ata needs a Whisper model to transcribe meetings. Choose an option "
                         + "below to download it automatically:",
                 "Skip for now");
     }
 
-    /** Always opens the dialog, letting the user download and switch to a different model. */
+    /** Always opens the dialog, letting the user download and switch to the other model. */
     static void show(Shell parent, AppConfig config) {
+        ExecutableLocator locator = new ExecutableLocator.Default();
+        WhisperModelOption recommended = WhisperModelOption.recommendedFor(new GpuDetector(locator).hasNvidiaGpu());
         Shell dialog = new Shell(parent, SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
         AppIcon.apply(dialog);
-        open(dialog, parent.getDisplay(), config,
+        open(dialog, parent.getDisplay(), config, recommended,
                 "Download another transcription model",
-                "Choose a model to download. Smaller models use less memory and are faster, with "
-                        + "some loss in accuracy:",
+                "Choose a model to download:",
                 "Close");
     }
 
     private static final int DIALOG_WIDTH = 340;
 
-    private static void open(Shell dialog, Display display, AppConfig config, String title, String introText,
-            String closeButtonLabel) {
+    private static void open(Shell dialog, Display display, AppConfig config, WhisperModelOption recommended,
+            String title, String introText, String closeButtonLabel) {
         dialog.setText(title);
         dialog.setLayout(new GridLayout(1, false));
 
@@ -85,7 +91,7 @@ final class ModelSetupDialog {
         for (int i = 0; i < options.length; i++) {
             Button radio = new Button(dialog, SWT.RADIO);
             radio.setText(options[i].label());
-            radio.setSelection(options[i] == WhisperModelOption.MEDIUM_Q5_0);
+            radio.setSelection(options[i] == recommended);
             GridData radioData = new GridData(SWT.FILL, SWT.CENTER, true, false);
             radioData.verticalIndent = 6;
             radio.setLayoutData(radioData);

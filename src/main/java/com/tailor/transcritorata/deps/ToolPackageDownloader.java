@@ -78,12 +78,10 @@ public final class ToolPackageDownloader {
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .connectTimeout(CONNECT_TIMEOUT)
                 .build();
-        HttpRequest request = HttpRequest.newBuilder(URI.create(option.downloadUrl()))
-                .timeout(RESPONSE_HEADERS_TIMEOUT)
-                .GET().build();
+        HttpRequest request = HttpRequest.newBuilder(URI.create(option.downloadUrl())).GET().build();
 
         try (ExecutorService readExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
-            HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            HttpResponse<InputStream> response = sendWithTimeout(client, request, readExecutor);
             if (response.statusCode() != 200) {
                 throw new IOException("Failed to download " + option.label() + " (HTTP " + response.statusCode() + ").");
             }
@@ -113,9 +111,6 @@ public final class ToolPackageDownloader {
                         + option.sha256() + ", got " + actualSha256
                         + "). The file may have been corrupted or tampered with in transit; it was not installed.");
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Download interrupted: " + e.getMessage(), e);
         }
     }
 
@@ -157,6 +152,38 @@ public final class ToolPackageDownloader {
                 }
                 zip.closeEntry();
             }
+        }
+    }
+
+    /**
+     * Sends {@code request}, bounded by {@link #RESPONSE_HEADERS_TIMEOUT}. This is done via a
+     * background task rather than {@code HttpRequest.Builder.timeout()} because that timeout was
+     * found to also bound the time spent reading a large {@code ofInputStream()} body afterwards,
+     * not just the wait for the response to start arriving -- which broke downloads of any file
+     * that legitimately takes longer than the timeout to fully transfer. {@code send()} itself
+     * returns as soon as headers are available (the body streams lazily from the returned
+     * {@link InputStream}), so bounding only this call achieves the originally intended "time to
+     * first byte" limit; {@link #readWithTimeout} bounds the rest of the transfer instead, without
+     * capping how long it may legitimately take in total.
+     */
+    private static HttpResponse<InputStream> sendWithTimeout(HttpClient client, HttpRequest request,
+            ExecutorService executor) throws IOException {
+        Future<HttpResponse<InputStream>> future =
+                executor.submit(() -> client.send(request, HttpResponse.BodyHandlers.ofInputStream()));
+        try {
+            return future.get(RESPONSE_HEADERS_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            throw new IOException("Timed out waiting for a response (" + RESPONSE_HEADERS_TIMEOUT.getSeconds() + "s).");
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof IOException io) {
+                throw io;
+            }
+            throw new IOException("Request failed: " + cause, cause);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Request interrupted.", e);
         }
     }
 

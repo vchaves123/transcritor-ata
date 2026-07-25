@@ -9,12 +9,16 @@ class WhisperModelOptionTest {
 
     @Test
     void buildsDownloadUrlFromHuggingFaceBaseAndFileName() {
-        assertEquals("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin",
-                WhisperModelOption.MEDIUM.downloadUrl());
-        assertEquals("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
-                WhisperModelOption.SMALL.downloadUrl());
-        assertEquals("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin",
-                WhisperModelOption.LARGE_V3.downloadUrl());
+        assertEquals("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium-q5_0.bin",
+                WhisperModelOption.MEDIUM_Q5_0.downloadUrl());
+        assertEquals("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin",
+                WhisperModelOption.LARGE_V3_TURBO_Q5_0.downloadUrl());
+    }
+
+    @Test
+    void recommendsLargeTurboForGpuAndMediumCompactForCpu() {
+        assertEquals(WhisperModelOption.LARGE_V3_TURBO_Q5_0, WhisperModelOption.recommendedFor(true));
+        assertEquals(WhisperModelOption.MEDIUM_Q5_0, WhisperModelOption.recommendedFor(false));
     }
 
     @Test

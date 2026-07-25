@@ -2,22 +2,15 @@ package com.tailor.transcritorata.deps;
 
 /**
  * Whisper ggml models officially published by ggerganov, offered to the user on first run so
- * they don't have to hunt for a download link themselves.
+ * they don't have to hunt for a download link themselves. Only the two models that came out
+ * ahead in benchmarking are offered: one for GPU machines, one for CPU-only machines -- see
+ * {@link #isRecommendedForCpu()}/{@link #isRecommendedForGpu()}.
  */
 public enum WhisperModelOption {
 
-    SMALL("ggml-small.bin", "Small", "~466 MB — faster, lower accuracy.",
-            "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b", false, false),
-    SMALL_Q5_1("ggml-small-q5_1.bin", "Small (compact)",
-            "~181 MB — same accuracy as Small, ~2.6x smaller and faster.",
-            "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb", false, false),
-    MEDIUM("ggml-medium.bin", "Medium", "~1.5 GB — good balance for CPU use.",
-            "6c14d5adee5f86394037b4e4e8b59f1673b6cee10e3cf0b11bbdbee79c156208", false, false),
     MEDIUM_Q5_0("ggml-medium-q5_0.bin", "Medium (recommended, compact)",
             "~514 MB — same accuracy as Medium, ~2.9x smaller and faster. Best all-around pick.",
             "19fea4b380c3a618ec4723c3eef2eb785ffba0d0538cf43f8f235e7b3b34220f", true, false),
-    LARGE_V3("ggml-large-v3.bin", "Large", "~2.9 GB — best accuracy, heaviest option.",
-            "64d182b440b98d5203c4f9bd541544d84c605196c4f7b845dfa11fb23594d1e2", false, false),
     LARGE_V3_TURBO_Q5_0("ggml-large-v3-turbo-q5_0.bin", "Large Turbo (compact)",
             "~547 MB — 5x smaller than Large. Fastest and most accurate option on a GPU; slower "
                     + "than Medium (compact) on CPU-only machines.",
@@ -80,5 +73,10 @@ public enum WhisperModelOption {
 
     public String downloadUrl() {
         return BASE_URL + fileName;
+    }
+
+    /** @return the single model to offer for download, based on whether an NVIDIA GPU is present. */
+    public static WhisperModelOption recommendedFor(boolean hasNvidiaGpu) {
+        return hasNvidiaGpu ? LARGE_V3_TURBO_Q5_0 : MEDIUM_Q5_0;
     }
 }
