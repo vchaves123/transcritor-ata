@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -85,6 +86,16 @@ public final class ProcessRunner {
         StringBuilder output = new StringBuilder();
         String commandLine = formatCommandLine(command);
         LOG.debug("Running external command: {}", commandLine);
+        // Full paths this command's arguments contain (source video, temp WAV, model, etc.),
+        // longest first so a path that's a prefix of another is redacted correctly either order.
+        // ffmpeg/whisper-cli commonly echo one of these path arguments back verbatim in their own
+        // stdout/stderr banners, which would otherwise re-reveal what redactPaths() below just hid
+        // from the command-line banner -- so every line of the process's own output is scrubbed
+        // for these same paths too, not just the banner.
+        List<String> pathsToRedact = command.stream()
+                .filter(ProcessRunner::looksLikeMultiSegmentPath)
+                .sorted(Comparator.comparingInt(String::length).reversed())
+                .toList();
         if (lineConsumer != null) {
             // The full command line (with absolute paths to the source video, temp WAV, model,
             // etc.) is only ever logged at DEBUG to the log file, never surfaced to this
@@ -114,9 +125,15 @@ public final class ProcessRunner {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     appendBounded(output, line);
+                    // NOTE: unlike the path-only redaction applied to the GUI-visible listener
+                    // below, this DEBUG line is the process's raw, unredacted output -- for
+                    // whisper-cli specifically, that can include actual transcribed meeting
+                    // speech, not just file paths. It sits behind the same DEBUG gate as the
+                    // lower-sensitivity command-line banner above, but is a materially higher
+                    // sensitivity class; anyone who can read the log file can read this.
                     LOG.debug("[proc] {}", line);
                     if (lineConsumer != null) {
-                        lineConsumer.accept(line);
+                        lineConsumer.accept(redactPathsInLine(line, pathsToRedact));
                     }
                 }
             }
@@ -205,6 +222,22 @@ public final class ProcessRunner {
         } catch (java.nio.file.InvalidPathException e) {
             return false;
         }
+    }
+
+    /**
+     * Replaces any occurrence of {@code paths} found verbatim inside {@code line} with just its
+     * file name -- catches the common case of ffmpeg/whisper-cli echoing one of this command's
+     * own path arguments back in their own output, which would otherwise defeat the redaction
+     * already applied to the command-line banner above.
+     */
+    private static String redactPathsInLine(String line, List<String> paths) {
+        String redacted = line;
+        for (String path : paths) {
+            if (redacted.contains(path)) {
+                redacted = redacted.replace(path, java.nio.file.Path.of(path).getFileName().toString());
+            }
+        }
+        return redacted;
     }
 
     /** Renders a command list as a single readable line, quoting arguments that contain spaces. */

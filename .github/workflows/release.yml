@@ -32,9 +32,16 @@ jobs:
       - name: Resolve version
         id: version
         shell: pwsh
+        # The workflow_dispatch "version" input is passed in via an environment variable rather
+        # than interpolated directly into this script's source text: a value like
+        # `1.0.0"; <attacker command> #` would otherwise be spliced into the PowerShell literally
+        # and execute as a script-injection. Reading it back with $env:DISPATCH_VERSION keeps it a
+        # plain string value the whole way through, regardless of its content.
+        env:
+          DISPATCH_VERSION: ${{ github.event.inputs.version }}
         run: |
           if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            $version = "${{ github.event.inputs.version }}"
+            $version = $env:DISPATCH_VERSION
           } else {
             $version = "${{ github.ref_name }}" -replace '^v', ''
           }
@@ -89,12 +96,19 @@ jobs:
           $tag = "v$version"
           $msi = Get-ChildItem "release-installer\*.msi" | Select-Object -First 1
 
+          # Published alongside the .msi so anyone downloading it manually from the Releases page
+          # can verify it wasn't corrupted or silently swapped for a different file after
+          # publishing (the upload below uses --clobber, which allows exactly that).
+          $checksumPath = "$($msi.FullName).sha256"
+          (Get-FileHash $msi.FullName -Algorithm SHA256).Hash.ToLower() + "  $($msi.Name)" |
+              Out-File -FilePath $checksumPath -Encoding ascii -NoNewline
+
           # Idempotent: creates the tag/release if it doesn't exist yet (workflow_dispatch runs
           # without a pre-existing tag), or just uploads the asset if the tag-push trigger
           # already has the tag and gh has auto-created a draft/notes for it.
           $existing = gh release view $tag 2>$null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $tag $msi.FullName --title "transcritor-ata $tag" --generate-notes
+            gh release create $tag $msi.FullName $checksumPath --title "transcritor-ata $tag" --generate-notes
           } else {
-            gh release upload $tag $msi.FullName --clobber
+            gh release upload $tag $msi.FullName $checksumPath --clobber
           }

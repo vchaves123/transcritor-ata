@@ -1,5 +1,6 @@
 package com.tailor.transcritorata.deps;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -9,6 +10,12 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,7 +67,7 @@ public final class UpdateChecker {
                 return Optional.empty();
             }
 
-            JsonNode root = MAPPER.readTree(readBounded(response.body()));
+            JsonNode root = MAPPER.readTree(readBounded(response.body(), TIMEOUT));
             String tagName = root.path("tag_name").asText("");
             String htmlUrl = root.path("html_url").asText("");
             String latestVersion = tagName.startsWith("v") ? tagName.substring(1) : tagName;
@@ -91,18 +98,58 @@ public final class UpdateChecker {
      * Reads {@code in} fully as UTF-8, refusing to read more than {@link #MAX_RESPONSE_BYTES} --
      * without this, a misbehaving/compromised response with no sane size could be read entirely
      * into memory before parsing even starts.
+     *
+     * <p>The read itself also has a hard deadline of {@code timeout}: {@link HttpRequest.Builder#timeout}
+     * only bounds how long {@code send()} takes to receive the response headers for a
+     * {@code BodyHandlers.ofInputStream()} request -- once that returns, reading the body here
+     * happens with no further deadline of its own, so a connection that stalls mid-body could
+     * otherwise block indefinitely despite the 5-second timeout configured on the request. Reading
+     * on a background thread and bounding it with {@link Future#get(long, TimeUnit)} enforces that
+     * deadline for real; on timeout the stream is closed to unblock the in-progress read.
      */
-    private static String readBounded(InputStream in) throws IOException {
-        byte[] buffer = new byte[8192];
-        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-        int read;
-        while ((read = in.read(buffer)) != -1) {
-            out.write(buffer, 0, read);
-            if (out.size() > MAX_RESPONSE_BYTES) {
-                throw new IOException("Update check response exceeded " + MAX_RESPONSE_BYTES + " bytes; aborting.");
-            }
+    private static String readBounded(InputStream in, Duration timeout) throws IOException {
+        ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "update-check-reader");
+            t.setDaemon(true);
+            return t;
+        });
+        try {
+            Future<byte[]> task = executor.submit(() -> {
+                byte[] buffer = new byte[8192];
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                int read;
+                while ((read = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, read);
+                    if (out.size() > MAX_RESPONSE_BYTES) {
+                        throw new IOException(
+                                "Update check response exceeded " + MAX_RESPONSE_BYTES + " bytes; aborting.");
+                    }
+                }
+                return out.toByteArray();
+            });
+            byte[] bytes = task.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            return new String(bytes, StandardCharsets.UTF_8);
+        } catch (TimeoutException e) {
+            closeQuietly(in);
+            throw new IOException("Update check response stalled past " + timeout + "; aborting.");
+        } catch (ExecutionException e) {
+            closeQuietly(in);
+            throw (e.getCause() instanceof IOException io) ? io : new IOException(e.getCause());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            closeQuietly(in);
+            throw new IOException("Interrupted while reading update check response.", e);
+        } finally {
+            executor.shutdownNow();
         }
-        return out.toString(StandardCharsets.UTF_8);
+    }
+
+    private static void closeQuietly(InputStream in) {
+        try {
+            in.close();
+        } catch (IOException ignored) {
+            // Best-effort: only used to unblock a stalled read on the worker thread.
+        }
     }
 
     /** @return true if {@code remoteVersion} is numerically newer than {@code currentVersion} (e.g. "1.0.10" > "1.0.9"). */

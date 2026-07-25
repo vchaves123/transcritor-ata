@@ -1,8 +1,11 @@
 package com.tailor.transcritorata.transcription;
 
 import java.io.IOException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -286,20 +289,54 @@ public final class TranscriptionPipeline {
         return videoFiles.get(0).getFileName() + " (+ " + (videoFiles.size() - 1) + " other files)";
     }
 
-    private static void deleteRecursively(Path path) {
-        if (!Files.exists(path)) {
+    private static void deleteRecursively(Path root) {
+        if (!Files.exists(root)) {
             return;
         }
-        try (var stream = Files.walk(path)) {
-            stream.sorted((a, b) -> b.compareTo(a)).forEach(p -> {
-                try {
-                    Files.deleteIfExists(p);
-                } catch (IOException e) {
-                    LOG.debug("Could not remove temporary file {}: {}", p, e.getMessage());
+        try {
+            Path rootReal = root.toRealPath();
+            Files.walkFileTree(root, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                    // Never descend into an NTFS junction planted inside this run's own temp
+                    // directory: unlike real symlinks, junctions need no special privilege to
+                    // create on Windows and Files.walk()'s default symlink avoidance doesn't
+                    // recognize them, so following one here would recursively delete whatever
+                    // real directory it points to. A junction's real path resolves outside
+                    // root's, so only its own entry is removed, never the target's contents.
+                    if (!dir.equals(root) && !dir.toRealPath().startsWith(rootReal)) {
+                        try {
+                            Files.deleteIfExists(dir);
+                        } catch (IOException e) {
+                            LOG.debug("Could not remove temporary file {}: {}", dir, e.getMessage());
+                        }
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    try {
+                        Files.deleteIfExists(file);
+                    } catch (IOException e) {
+                        LOG.debug("Could not remove temporary file {}: {}", file, e.getMessage());
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
+                    try {
+                        Files.deleteIfExists(dir);
+                    } catch (IOException e) {
+                        LOG.debug("Could not remove temporary file {}: {}", dir, e.getMessage());
+                    }
+                    return FileVisitResult.CONTINUE;
                 }
             });
         } catch (IOException e) {
-            LOG.debug("Could not clean up temporary directory {}: {}", path, e.getMessage());
+            LOG.debug("Could not clean up temporary directory {}: {}", root, e.getMessage());
         }
     }
 }

@@ -1,11 +1,13 @@
 package com.tailor.transcritorata.deps;
 
 import java.io.IOException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -65,15 +67,7 @@ public final class StaleTempFileCleaner {
     private static void deleteQuietly(Path path) {
         try {
             if (Files.isDirectory(path)) {
-                try (var walk = Files.walk(path)) {
-                    walk.sorted(Comparator.reverseOrder()).forEach(p -> {
-                        try {
-                            Files.deleteIfExists(p);
-                        } catch (IOException ignored) {
-                            // Best-effort: leaves the rest of the sweep unaffected.
-                        }
-                    });
-                }
+                deleteRecursivelyWithoutFollowingReparsePoints(path);
             } else {
                 Files.deleteIfExists(path);
             }
@@ -81,5 +75,54 @@ public final class StaleTempFileCleaner {
         } catch (IOException e) {
             LOG.debug("Could not remove leftover temporary file {}: {}", path, e.getMessage());
         }
+    }
+
+    /**
+     * Deletes {@code root} and its contents, but never descends into an NTFS junction (a
+     * directory reparse point) planted inside it. {@code Files.walk()}'s default symlink
+     * avoidance does not recognize junctions -- unlike real symlinks, they require no special
+     * privilege to create on Windows -- so a same-user process could otherwise plant one under
+     * {@code root} and have this cleanup recursively delete whatever real directory it points to.
+     * A junction is detected by comparing each subdirectory's real (resolved) path against
+     * {@code root}'s: a plain subdirectory always resolves to somewhere under {@code root}, while
+     * a junction resolves to its target instead. When that happens, only the junction entry
+     * itself is removed -- never its target's contents.
+     */
+    private static void deleteRecursivelyWithoutFollowingReparsePoints(Path root) throws IOException {
+        Path rootReal = root.toRealPath();
+        Files.walkFileTree(root, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                if (!dir.equals(root) && !dir.toRealPath().startsWith(rootReal)) {
+                    try {
+                        Files.deleteIfExists(dir);
+                    } catch (IOException ignored) {
+                        // Best-effort: leaves the rest of the sweep unaffected.
+                    }
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                try {
+                    Files.deleteIfExists(file);
+                } catch (IOException ignored) {
+                    // Best-effort: leaves the rest of the sweep unaffected.
+                }
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
+                try {
+                    Files.deleteIfExists(dir);
+                } catch (IOException ignored) {
+                    // Best-effort: leaves the rest of the sweep unaffected.
+                }
+                return FileVisitResult.CONTINUE;
+            }
+        });
     }
 }

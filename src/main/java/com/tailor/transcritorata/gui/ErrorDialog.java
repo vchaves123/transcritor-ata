@@ -28,6 +28,15 @@ final class ErrorDialog {
         messageData.widthHint = 420;
         icon.setLayoutData(messageData);
 
+        Label detailsWarning = new Label(dialog, SWT.WRAP);
+        detailsWarning.setText("Details may include excerpts of the transcribed audio content -- "
+                + "avoid sharing a screenshot of this if the recording is confidential.");
+        GridData warningData = new GridData(SWT.FILL, SWT.CENTER, true, false);
+        warningData.widthHint = 420;
+        detailsWarning.setLayoutData(warningData);
+        detailsWarning.setVisible(false);
+        ((GridData) detailsWarning.getLayoutData()).exclude = true;
+
         Text detailsText = new Text(dialog, SWT.MULTI | SWT.BORDER | SWT.V_SCROLL | SWT.WRAP);
         detailsText.setText(details == null || details.isBlank() ? "(no additional details)" : details);
         detailsText.setEditable(false);
@@ -50,6 +59,8 @@ final class ErrorDialog {
                 boolean showing = detailsText.isVisible();
                 detailsText.setVisible(!showing);
                 ((GridData) detailsText.getLayoutData()).exclude = showing;
+                detailsWarning.setVisible(!showing);
+                ((GridData) detailsWarning.getLayoutData()).exclude = showing;
                 toggleDetails.setText(showing ? "View details" : "Hide details");
                 dialog.layout(true, true);
                 dialog.pack();

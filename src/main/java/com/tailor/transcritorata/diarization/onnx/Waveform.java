@@ -25,6 +25,25 @@ public final class Waveform {
     private Waveform() {
     }
 
+    /**
+     * Reads {@code in} fully, refusing to buffer more than {@code maxBytes} -- unlike a plain
+     * {@code readAllBytes()}, this is checked incrementally as data arrives, so a WAV whose header
+     * doesn't declare a frame count can't grow this buffer without bound before being rejected.
+     */
+    private static byte[] readBounded(AudioInputStream in, long maxBytes) throws IOException {
+        byte[] buffer = new byte[8192];
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        int read;
+        while ((read = in.read(buffer)) != -1) {
+            out.write(buffer, 0, read);
+            if (out.size() > maxBytes) {
+                throw new IOException("Recording too long for speaker identification; skipping this optional "
+                        + "feature.");
+            }
+        }
+        return out.toByteArray();
+    }
+
     public static float[] readMono16k(Path wav) throws IOException {
         try (AudioInputStream in = AudioSystem.getAudioInputStream(wav.toFile())) {
             AudioFormat format = in.getFormat();
@@ -37,11 +56,12 @@ public final class Waveform {
                 throw new IOException("Recording too long for speaker identification (" + frameLength
                         + " frames, limit " + MAX_FRAMES + "); skipping this optional feature.");
             }
-            byte[] bytes = in.readAllBytes();
-            if (bytes.length / 2L > MAX_FRAMES) {
-                throw new IOException("Recording too long for speaker identification; skipping this optional "
-                        + "feature.");
-            }
+            // Enforced again here, during the read itself: the check above only catches a
+            // well-formed WAV header (the normal case). A header with an unspecified frame count
+            // would otherwise let readAllBytes() below buffer an unbounded amount of data into
+            // memory before any cap is checked; reading in bounded chunks means this cap is hit
+            // during the read instead.
+            byte[] bytes = readBounded(in, MAX_FRAMES * 2L + 2);
             boolean bigEndian = format.isBigEndian();
             int sampleCount = bytes.length / 2;
             float[] samples = new float[sampleCount];

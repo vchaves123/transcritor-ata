@@ -114,7 +114,7 @@ final class JavaEnvironmentDialog {
                 property("java.version"),
                 property("java.vm.name"),
                 property("java.vm.version"),
-                property("java.home"),
+                redactUserHome(property("java.home")),
                 property("os.name"),
                 property("os.version"),
                 property("os.arch"),
@@ -124,5 +124,19 @@ final class JavaEnvironmentDialog {
 
     private static String property(String key) {
         return System.getProperty(key, "(unknown)");
+    }
+
+    /**
+     * Replaces a leading {@code user.home} prefix with a placeholder: this app's per-user install
+     * means {@code java.home} (the bundled runtime's own path) sits under the Windows account's
+     * profile directory, so showing it verbatim in this report -- meant to be copied and shared
+     * with support -- would needlessly reveal the Windows account name to whoever receives it.
+     */
+    private static String redactUserHome(String path) {
+        String userHome = System.getProperty("user.home");
+        if (userHome != null && !userHome.isBlank() && path.startsWith(userHome)) {
+            return "%USERPROFILE%" + path.substring(userHome.length());
+        }
+        return path;
     }
 }
