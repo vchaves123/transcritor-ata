@@ -6,6 +6,8 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+## [1.0.16] - 2026-07-25
+
 ### Changed
 - Speaker identification and beam-search (accurate) transcription are now always on. Removed the
   "Identify participants in the transcription" and "Prioritize speed and GPU memory usage" options
@@ -17,6 +19,48 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
   1.0.15 below). A confirmed checksum mismatch on startup is no longer just a log line: it now
   shows a blocking "Security warning" dialog and refuses to start, since a tampered executable
   would otherwise run with full code-execution capability.
+- Only two Whisper models are offered on first run/re-download: Medium (compact) for CPU-only
+  machines and Large Turbo (compact) for machines with an NVIDIA GPU -- the two that came out
+  ahead in benchmarking, replacing the previous list of six.
+- The startup dialog offering to download ffmpeg/whisper-cli now also offers the recommended
+  Whisper model in the same place, so everything the app needs is downloadable from a single
+  dialog. Each item now shows its approximate download size, and the dialog reports
+  "Extracting..."/"Verifying..." status after a download completes -- both steps take real,
+  previously-unreported time for a large package, which could look like a hang.
+
+### Removed
+- The "Check installation" item under the Help menu and its dialog.
+- The "Download another model..." button in Preferences, now redundant with the consolidated
+  startup download dialog above (a specific local model file can still be chosen there).
+
+### Fixed
+- A background/local process could plant an NTFS junction inside the app's own temp directory
+  and have the leftover-temp-file cleanup (or a transcription run's own cleanup) recursively
+  delete whatever real directory the junction pointed to. Both cleanup paths now detect and skip
+  junctions instead of following them.
+- The on-screen process log redacted file paths from the ffmpeg/whisper-cli command banner, but
+  not from those tools' own output lines, which commonly echo a path back verbatim -- the
+  redaction now applies to the whole log, not just the banner.
+- Downloading ffmpeg or whisper-cli (or a Whisper model) could fail after exactly 30 seconds
+  regardless of progress, because the HTTP request timeout intended to bound only the wait for a
+  response turned out to also bound reading the whole (potentially 600+ MB) body. Only the initial
+  response is bounded by that timeout now; a separate stall check (unchanged) still catches a
+  connection that truly stops sending data.
+- The Whisper model's frame-count safety cap was checked only after fully buffering the file into
+  memory; a WAV with no declared frame count could bypass it. The cap is now enforced during the
+  read itself.
+- `UpdateChecker`'s update-check request could hang indefinitely past its configured timeout if a
+  connection stalled mid-response; a real read deadline is now enforced.
+- The Java-environment report (for pasting into a support request) no longer includes the Windows
+  account's profile path.
+
+### Security
+- The GitHub Release workflow now publishes a SHA-256 checksum alongside the `.msi`, so a
+  post-publish overwrite of the release asset is detectable.
+- The `workflow_dispatch` version input is passed to the release script via an environment
+  variable instead of being spliced into the PowerShell source text.
+- The failure-details panel in the error dialog now warns that it may include excerpts of the
+  transcribed audio, since it isn't safe to screenshot/share unconditionally.
 
 ## [1.0.15] - 2026-07-24
 
