@@ -49,6 +49,17 @@ public final class ToolPackageDownloader {
         void onProgress(long downloadedBytes, long totalBytes);
     }
 
+    @FunctionalInterface
+    public interface PhaseListener {
+        /**
+         * Called when work moves on to a new phase after the download itself completes --
+         * extracting the archive and re-hashing the installed files both take real, unreported
+         * time for a large package, and would otherwise look like a hang once the progress bar
+         * already reads 100%.
+         */
+        void onPhase(String phase);
+    }
+
     /**
      * Downloads and extracts {@code option} into {@code toolsDir}/{@code option.subDir()}.
      *
@@ -56,13 +67,15 @@ public final class ToolPackageDownloader {
      * @throws IOException if the download/checksum/extraction fails or is cancelled
      */
     public Path downloadAndInstall(ToolPackageOption option, Path toolsDir, ProgressListener listener,
-            AtomicBoolean cancelled) throws IOException {
+            PhaseListener phaseListener, AtomicBoolean cancelled) throws IOException {
         Path targetDir = toolsDir.resolve(option.subDir());
         Files.createDirectories(toolsDir);
         Path zipFile = Files.createTempFile(toolsDir, "download-" + option.subDir() + "-", ".zip.part");
         try {
             downloadZip(option, zipFile, listener, cancelled);
+            phaseListener.onPhase("Extracting " + option.label() + "...");
             extractZip(zipFile, targetDir, option.flattenTopLevelFolder());
+            phaseListener.onPhase("Verifying " + option.label() + "...");
             ToolChecksumManifest.updateFor(toolsDir, targetDir);
             return option.expectedExecutable(toolsDir);
         } finally {

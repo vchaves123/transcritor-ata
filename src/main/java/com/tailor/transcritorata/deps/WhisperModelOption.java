@@ -8,10 +8,10 @@ package com.tailor.transcritorata.deps;
  */
 public enum WhisperModelOption {
 
-    MEDIUM_Q5_0("ggml-medium-q5_0.bin", "Medium (recommended, compact)",
+    MEDIUM_Q5_0("ggml-medium-q5_0.bin", 539_212_467L, "Medium (recommended, compact)",
             "~514 MB — same accuracy as Medium, ~2.9x smaller and faster. Best all-around pick.",
             "19fea4b380c3a618ec4723c3eef2eb785ffba0d0538cf43f8f235e7b3b34220f", true, false),
-    LARGE_V3_TURBO_Q5_0("ggml-large-v3-turbo-q5_0.bin", "Large Turbo (compact)",
+    LARGE_V3_TURBO_Q5_0("ggml-large-v3-turbo-q5_0.bin", 574_041_195L, "Large Turbo (compact)",
             "~547 MB — 5x smaller than Large. Fastest and most accurate option on a GPU; slower "
                     + "than Medium (compact) on CPU-only machines.",
             "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2", false, true);
@@ -19,20 +19,27 @@ public enum WhisperModelOption {
     private static final String BASE_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/";
 
     private final String fileName;
+    private final long downloadSizeBytes;
     private final String label;
     private final String description;
     private final String sha256;
     private final boolean recommendedForCpu;
     private final boolean recommendedForGpu;
 
-    WhisperModelOption(String fileName, String label, String description, String sha256,
+    WhisperModelOption(String fileName, long downloadSizeBytes, String label, String description, String sha256,
             boolean recommendedForCpu, boolean recommendedForGpu) {
         this.fileName = fileName;
+        this.downloadSizeBytes = downloadSizeBytes;
         this.label = label;
         this.description = description;
         this.sha256 = sha256;
         this.recommendedForCpu = recommendedForCpu;
         this.recommendedForGpu = recommendedForGpu;
+    }
+
+    /** @return the approximate size of the model file itself (pinned at the time this URL was added). */
+    public long downloadSizeBytes() {
+        return downloadSizeBytes;
     }
 
     /**

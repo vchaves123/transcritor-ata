@@ -39,20 +39,6 @@ final class PreferencesDialog {
         Text whisperModelText = row(dialog, "Whisper model (.bin)",
                 config.get(AppConfig.KEY_WHISPER_MODEL, ""), browseFile(dialog, "*.bin"));
 
-        new Label(dialog, SWT.NONE); // aligns the column with the other rows
-        Button downloadModelButton = new Button(dialog, SWT.PUSH);
-        downloadModelButton.setText("Download another model...");
-        GridData downloadModelData = new GridData(SWT.FILL, SWT.CENTER, true, false);
-        downloadModelData.horizontalSpan = 2;
-        downloadModelButton.setLayoutData(downloadModelData);
-        downloadModelButton.addSelectionListener(new SelectionAdapter() {
-            @Override
-            public void widgetSelected(SelectionEvent e) {
-                ModelSetupDialog.show(dialog, config);
-                whisperModelText.setText(config.get(AppConfig.KEY_WHISPER_MODEL, ""));
-            }
-        });
-
         boolean[] saved = { false };
 
         Button save = new Button(dialog, SWT.PUSH);

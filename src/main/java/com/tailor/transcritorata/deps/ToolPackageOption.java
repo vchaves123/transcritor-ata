@@ -10,7 +10,7 @@ import java.nio.file.Path;
  */
 public enum ToolPackageOption {
 
-    FFMPEG("ffmpeg",
+    FFMPEG("ffmpeg", 146_681_779L,
             "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-23-14-16/ffmpeg-N-125748-g80eb9e99b9-win64-lgpl.zip",
             "c1adebb39039462f7ffdbf5d99ea1491e5203160529fc176ea639ec9e36bdbce",
             "ffmpeg",
@@ -19,14 +19,14 @@ public enum ToolPackageOption {
             true,
             "bin/ffmpeg.exe"),
 
-    WHISPER_CLI_CPU("whisper-cli (CPU)",
+    WHISPER_CLI_CPU("whisper-cli (CPU)", 7_982_101L,
             "https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.1/whisper-bin-x64.zip",
             "7d8be46ecd31828e1eb7a2ecdd0d6b314feafd82163038ab6092594b0a063539",
             "whisper-cpu",
             false,
             "Release/whisper-cli.exe"),
 
-    WHISPER_CLI_CUDA("whisper-cli (NVIDIA GPU)",
+    WHISPER_CLI_CUDA("whisper-cli (NVIDIA GPU)", 677_887_125L,
             "https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.1/whisper-cublas-12.4.0-bin-x64.zip",
             "106a2030eff8998e4ef320fe72e263a78449e9040386ee27c41ea80b001b601b",
             "whisper-cuda",
@@ -34,15 +34,17 @@ public enum ToolPackageOption {
             "Release/whisper-cli.exe");
 
     private final String label;
+    private final long downloadSizeBytes;
     private final String downloadUrl;
     private final String sha256;
     private final String subDir;
     private final boolean flattenTopLevelFolder;
     private final String relativeExecutablePath;
 
-    ToolPackageOption(String label, String downloadUrl, String sha256, String subDir,
+    ToolPackageOption(String label, long downloadSizeBytes, String downloadUrl, String sha256, String subDir,
             boolean flattenTopLevelFolder, String relativeExecutablePath) {
         this.label = label;
+        this.downloadSizeBytes = downloadSizeBytes;
         this.downloadUrl = downloadUrl;
         this.sha256 = sha256;
         this.subDir = subDir;
@@ -52,6 +54,11 @@ public enum ToolPackageOption {
 
     public String label() {
         return label;
+    }
+
+    /** @return the approximate size of the zip archive itself (pinned at the time this URL was added). */
+    public long downloadSizeBytes() {
+        return downloadSizeBytes;
     }
 
     public String downloadUrl() {

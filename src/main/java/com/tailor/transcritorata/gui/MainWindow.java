@@ -108,9 +108,9 @@ public final class MainWindow {
 
     /**
      * Best-effort, non-blocking check against the GitHub Releases API. Runs after the window is
-     * already open (not before, unlike {@link ModelSetupDialog#showIfNeeded}) so a slow/unavailable
-     * network never delays startup -- if a newer version turns up a little later, the dialog just
-     * pops up on top of the already-usable window.
+     * already open (not before, unlike {@link PrerequisiteSetupDialog#showIfNeeded}) so a
+     * slow/unavailable network never delays startup -- if a newer version turns up a little later,
+     * the dialog just pops up on top of the already-usable window.
      */
     private void checkForUpdatesInBackground() {
         Thread.ofVirtual().start(() -> UpdateChecker.checkForUpdate().ifPresent(update -> display.asyncExec(() -> {

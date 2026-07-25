@@ -1,5 +1,6 @@
 package com.tailor.transcritorata.gui;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,35 +28,103 @@ import com.tailor.transcritorata.deps.ExecutableLocator;
 import com.tailor.transcritorata.deps.GpuDetector;
 import com.tailor.transcritorata.deps.ToolPackageDownloader;
 import com.tailor.transcritorata.deps.ToolPackageOption;
+import com.tailor.transcritorata.deps.WhisperModelDownloader;
+import com.tailor.transcritorata.deps.WhisperModelOption;
+import com.tailor.transcritorata.deps.WhisperModelSetupChecker;
 import com.tailor.transcritorata.deps.WhisperVariantSelector;
 
 /**
- * Startup dialog offering to download ffmpeg and/or whisper-cli when neither is already present
- * (bundled under {@code tools/}, configured explicitly, or found on PATH -- see
- * {@link DependencyChecker}). Lets the installer stay small instead of always bundling ~1 GB of
- * binaries that a given machine might not even need in that exact form (e.g. the CUDA build on a
- * machine with no NVIDIA GPU).
+ * Startup dialog offering to download ffmpeg, whisper-cli, and/or a Whisper model, whichever
+ * aren't already present (bundled under {@code tools/}, configured explicitly, or found on PATH --
+ * see {@link DependencyChecker} / {@link WhisperModelSetupChecker}). Everything the app needs to
+ * run is downloadable from this single place, so the installer can stay small instead of always
+ * bundling ~1 GB+ of binaries and models that a given machine might not even need in that exact
+ * form (e.g. the CUDA build on a machine with no NVIDIA GPU).
  */
 final class PrerequisiteSetupDialog {
 
     private static final Logger LOG = LoggerFactory.getLogger(PrerequisiteSetupDialog.class);
     private static final int DIALOG_WIDTH = 360;
+    private static final String MODELS_DIR = "tools/models";
+
+    @FunctionalInterface
+    private interface ProgressCallback {
+        void onProgress(long done, long total);
+    }
+
+    @FunctionalInterface
+    private interface PhaseCallback {
+        void onPhase(String phase);
+    }
+
+    /** One item offered for download: a tool package or the recommended Whisper model. */
+    private interface DownloadItem {
+        String label();
+
+        long sizeBytes();
+
+        void download(AppConfig config, PhaseCallback phase, ProgressCallback progress, AtomicBoolean cancelled)
+                throws IOException;
+    }
+
+    private record ToolItem(ToolPackageOption option) implements DownloadItem {
+        @Override
+        public String label() {
+            return option.label();
+        }
+
+        @Override
+        public long sizeBytes() {
+            return option.downloadSizeBytes();
+        }
+
+        @Override
+        public void download(AppConfig config, PhaseCallback phase, ProgressCallback progress,
+                AtomicBoolean cancelled) throws IOException {
+            new ToolPackageDownloader().downloadAndInstall(option, AppHome.resolve("tools"),
+                    progress::onProgress, phase::onPhase, cancelled);
+        }
+    }
+
+    private record ModelItem(WhisperModelOption option) implements DownloadItem {
+        @Override
+        public String label() {
+            return option.label();
+        }
+
+        @Override
+        public long sizeBytes() {
+            return option.downloadSizeBytes();
+        }
+
+        @Override
+        public void download(AppConfig config, PhaseCallback phase, ProgressCallback progress,
+                AtomicBoolean cancelled) throws IOException {
+            Path targetDir = AppHome.resolve(MODELS_DIR);
+            new WhisperModelDownloader().download(option, targetDir, progress::onProgress, cancelled);
+            config.set(AppConfig.KEY_WHISPER_MODEL, targetDir.resolve(option.fileName()).toString());
+            config.save();
+        }
+    }
 
     private PrerequisiteSetupDialog() {
     }
 
-    /** Startup gate: only opens when ffmpeg and/or whisper-cli aren't already available. */
+    /** Startup gate: only opens when ffmpeg, whisper-cli, and/or a model aren't already available. */
     static void showIfNeeded(Display display, AppConfig config) {
         ExecutableLocator locator = new ExecutableLocator.Default();
         DependencyChecker checker = new DependencyChecker(config, locator);
+        boolean hasGpu = new GpuDetector(locator).hasNvidiaGpu();
 
-        List<ToolPackageOption> needed = new ArrayList<>();
+        List<DownloadItem> needed = new ArrayList<>();
         if (!checker.checkFfmpeg().ok()) {
-            needed.add(ToolPackageOption.FFMPEG);
+            needed.add(new ToolItem(ToolPackageOption.FFMPEG));
         }
         if (!checker.checkWhisperBinary().ok()) {
-            boolean hasGpu = new GpuDetector(locator).hasNvidiaGpu();
-            needed.add(hasGpu ? ToolPackageOption.WHISPER_CLI_CUDA : ToolPackageOption.WHISPER_CLI_CPU);
+            needed.add(new ToolItem(hasGpu ? ToolPackageOption.WHISPER_CLI_CUDA : ToolPackageOption.WHISPER_CLI_CPU));
+        }
+        if (WhisperModelSetupChecker.isNeeded(config, locator)) {
+            needed.add(new ModelItem(WhisperModelOption.recommendedFor(hasGpu)));
         }
         if (needed.isEmpty()) {
             return;
@@ -63,7 +132,7 @@ final class PrerequisiteSetupDialog {
         open(display, config, needed);
     }
 
-    private static void open(Display display, AppConfig config, List<ToolPackageOption> needed) {
+    private static void open(Display display, AppConfig config, List<DownloadItem> needed) {
         Shell dialog = new Shell(display, SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
         AppIcon.apply(dialog);
         dialog.setText("Initial setup — required tools");
@@ -79,7 +148,7 @@ final class PrerequisiteSetupDialog {
         Button[] checkboxes = new Button[needed.size()];
         for (int i = 0; i < needed.size(); i++) {
             Button checkbox = new Button(dialog, SWT.CHECK);
-            checkbox.setText(needed.get(i).label());
+            checkbox.setText(needed.get(i).label() + " (~" + formatBytes(needed.get(i).sizeBytes()) + ")");
             checkbox.setSelection(true);
             GridData checkboxData = new GridData(SWT.FILL, SWT.CENTER, true, false);
             checkboxData.verticalIndent = 6;
@@ -125,7 +194,7 @@ final class PrerequisiteSetupDialog {
         downloadButton.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
-                List<ToolPackageOption> selected = new ArrayList<>();
+                List<DownloadItem> selected = new ArrayList<>();
                 for (int i = 0; i < needed.size(); i++) {
                     if (checkboxes[i].getSelection()) {
                         selected.add(needed.get(i));
@@ -158,29 +227,32 @@ final class PrerequisiteSetupDialog {
         }
     }
 
-    private static void runDownloads(Display display, Shell dialog, AppConfig config, List<ToolPackageOption> selected,
+    private static void runDownloads(Display display, Shell dialog, AppConfig config, List<DownloadItem> selected,
             ProgressBar progressBar, Label statusLabel, Button downloadButton, Button skipButton, Button[] checkboxes,
             AtomicBoolean cancelled, AtomicBoolean downloading) {
-        Path toolsDir = AppHome.resolve("tools");
-        ToolPackageDownloader downloader = new ToolPackageDownloader();
         try {
             for (int i = 0; i < selected.size(); i++) {
-                ToolPackageOption option = selected.get(i);
+                DownloadItem item = selected.get(i);
                 int position = i + 1;
                 display.asyncExec(() -> {
                     if (!dialog.isDisposed()) {
-                        statusLabel.setText("Downloading " + option.label() + " (" + position + "/" + selected.size() + ")...");
+                        statusLabel.setText("Downloading " + item.label() + " (" + position + "/" + selected.size() + ")...");
                         progressBar.setSelection(0);
                     }
                 });
-                downloader.downloadAndInstall(option, toolsDir,
+                item.download(config,
+                        phaseText -> display.asyncExec(() -> {
+                            if (!dialog.isDisposed()) {
+                                statusLabel.setText(phaseText + " (" + position + "/" + selected.size() + ")");
+                            }
+                        }),
                         (done, total) -> display.asyncExec(() -> {
                             if (dialog.isDisposed()) {
                                 return;
                             }
                             if (total > 0) {
                                 progressBar.setSelection((int) (done * 100 / total));
-                                statusLabel.setText("Downloading " + option.label() + " (" + position + "/"
+                                statusLabel.setText("Downloading " + item.label() + " (" + position + "/"
                                         + selected.size() + ")... " + formatBytes(done) + " / " + formatBytes(total));
                             }
                         }),
