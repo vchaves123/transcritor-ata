@@ -70,11 +70,9 @@ from version control (`.gitignore`) because they are large third-party binaries;
 yourself if you want this automatic behavior, or manually configure a single fixed path in the
 preferences.
 
-**Low-VRAM GPU (2 GB or less)**: if transcription fails due to insufficient GPU memory with larger
-models (`medium`, `large-v3`), check the "Prioritize speed and GPU memory usage" option in
-Preferences. It swaps beam search (whisper.cpp's default) for greedy decoding, which uses
-significantly less VRAM and is faster, at the cost of some accuracy. In addition, the app already
-automatically retries transcription on the CPU if the GPU runs out of memory mid-transcription.
+**Low-VRAM GPU (2 GB or less)**: if a larger model (`medium`, `large-v3`) runs out of GPU memory,
+the app automatically retries with greedy decoding (faster, less VRAM, slightly less accurate)
+before falling back to a smaller model and, if needed, the CPU — no configuration required.
 
 **Recordings with long silences**: whisper.cpp is enabled to use Voice Activity Detection (VAD)
 automatically for every transcription. Instead of blindly processing fixed 30-second windows
@@ -108,11 +106,10 @@ If you'd rather download it yourself: https://huggingface.co/ggerganov/whisper.c
 
 Save the file and select it in the application's preferences.
 
-### 4. (Optional) Speaker identification
+### 4. Speaker identification
 
-No extra installation or download is required. Simply check the "Identify participants in the
-transcription" checkbox in Preferences before transcribing, so the minutes indicate who spoke
-each segment (`Speaker 1`, `Speaker 2`, ...).
+No extra installation or download is required. Every transcription automatically identifies
+participants, so the minutes indicate who spoke each segment (`Speaker 1`, `Speaker 2`, ...).
 
 This feature runs **entirely within the program itself**, with no external process: it's a Java
 reimplementation of the neural pipeline [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1)
@@ -148,7 +145,7 @@ and a normal "Uninstall" entry under Windows Settings → Apps. Installing a new
 automatically upgrades/replaces the previous one. It includes:
 
 - A dedicated Java runtime (no need to have Java installed).
-- Speaker identification (ONNX models embedded in the jar itself, optional).
+- Speaker identification (ONNX models embedded in the jar itself, always on).
 
 **Not included** (the installer stays small by not bundling these — see "Prerequisites" above): on
 first run, a dialog offers to download ffmpeg and whisper-cli automatically (picking the CPU or
@@ -184,7 +181,7 @@ by default).
 - `audio` — audio extraction via ffmpeg and external process execution.
 - `transcription` — transcription engine (Whisper.cpp) and the orchestrating pipeline.
 - `minutes` — generation of `.docx` minutes (Apache POI).
-- `diarization` — optional speaker identification (neural pipeline via ONNX Runtime).
+- `diarization` — speaker identification (neural pipeline via ONNX Runtime).
 - `deps` — dependency checker.
 - `config` — user preferences.
 
@@ -195,8 +192,8 @@ by default).
 
 ## Known limitations
 
-- Speaker identification (diarization) is optional and experimental — accuracy can vary
-  considerably depending on the recording. See item 4 of the prerequisites.
+- Speaker identification (diarization) is still experimental — accuracy can vary considerably
+  depending on the recording. See item 4 of the prerequisites.
 - The Windows installer (`.msi`) has no wizard UI or completion screen of its own (a limitation
   of `jpackage`'s MSI packaging) — it installs quickly and quietly, without visual confirmation
   beyond the Start Menu/Desktop shortcuts it creates.

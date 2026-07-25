@@ -162,7 +162,6 @@ public final class MainWindow {
         elapsedTimeLabel.setLayoutData(new GridData(SWT.END, SWT.CENTER, true, false));
 
         buildPhaseSections();
-        refreshDiarizationSectionStatus();
     }
 
     private void buildFileListSection() {
@@ -316,7 +315,6 @@ public final class MainWindow {
             public void widgetSelected(SelectionEvent e) {
                 if (PreferencesDialog.open(shell, config)) {
                     refreshDependencyState();
-                    refreshDiarizationSectionStatus();
                 }
             }
         });
@@ -513,12 +511,6 @@ public final class MainWindow {
         });
     }
 
-    private void refreshDiarizationSectionStatus() {
-        if (diarizationSection != null) {
-            diarizationSection.setStatus(config.getBoolean(AppConfig.KEY_DIARIZATION_ENABLED, false) ? "" : "Disabled");
-        }
-    }
-
     private void showDependencyDialog() {
         Thread.ofVirtual().start(() -> {
             DependencyChecker checker = new DependencyChecker(config);
@@ -536,7 +528,6 @@ public final class MainWindow {
             return;
         }
 
-        boolean diarizationEnabled = config.getBoolean(AppConfig.KEY_DIARIZATION_ENABLED, false);
         List<Path> videos = selectedVideos.stream().map(VideoFileInfo::path).toList();
 
         setControlsEnabledWhileBusy(true);
@@ -547,14 +538,14 @@ public final class MainWindow {
         audioSection.setStatus("");
         transcriptionSection.setStatus("");
         minutesSection.setStatus("");
-        diarizationSection.setStatus(diarizationEnabled ? "" : "Disabled");
+        diarizationSection.setStatus("");
         currentTranscriptionAttempt = "";
         startElapsedTimer();
 
         ProcessRunner.Handle handle = new ProcessRunner.Handle();
         currentHandle = handle;
 
-        Thread.ofVirtual().start(() -> runPipeline(handle, videos, diarizationEnabled));
+        Thread.ofVirtual().start(() -> runPipeline(handle, videos));
     }
 
     private void cancelTranscription() {
@@ -632,9 +623,9 @@ public final class MainWindow {
         elapsedTimerActive = false;
     }
 
-    private void runPipeline(ProcessRunner.Handle handle, List<Path> videos, boolean diarizationEnabled) {
+    private void runPipeline(ProcessRunner.Handle handle, List<Path> videos) {
         try {
-            TranscriptionPipeline pipeline = buildPipeline(diarizationEnabled);
+            TranscriptionPipeline pipeline = buildPipeline();
             Path outputDir = resolveOutputDir(videos);
             // percent == -1 is the sentinel used by the engines/ffmpeg for "just a log line"
             // (raw process output, transcribed sentences as they are recognized, etc.), which
@@ -754,7 +745,7 @@ public final class MainWindow {
         ErrorDialog.show(shell, friendlyMessage, details);
     }
 
-    private TranscriptionPipeline buildPipeline(boolean diarizationEnabled) throws Exception {
+    private TranscriptionPipeline buildPipeline() throws Exception {
         long timeout = config.getInt(AppConfig.KEY_PROCESS_TIMEOUT_SECONDS, (int) DEFAULT_TIMEOUT_SECONDS);
         AudioExtractor audioExtractor = new AudioExtractor(resolveFfmpegExecutable(), timeout);
 
@@ -762,9 +753,9 @@ public final class MainWindow {
 
         DocxMinutesGenerator generator = new DocxMinutesGenerator();
 
-        SpeakerDiarizer diarizer = diarizationEnabled ? new OnnxSpeakerDiarizer() : null;
+        SpeakerDiarizer diarizer = new OnnxSpeakerDiarizer();
 
-        return new TranscriptionPipeline(audioExtractor, engine, generator, diarizer, diarizationEnabled);
+        return new TranscriptionPipeline(audioExtractor, engine, generator, diarizer);
     }
 
     private String resolveFfmpegExecutable() {
@@ -817,11 +808,10 @@ public final class MainWindow {
         List<AdaptiveWhisperEngine.ModelCandidate> candidates = discoverModelCandidates(configuredModelPath);
         Path cpuFallbackModel = WhisperModelSelector.selectCpuFallback(candidates, configuredModelPath);
 
-        boolean preferFastModeFirst = config.getBoolean(AppConfig.KEY_WHISPER_FAST_MODE, false);
         GpuDetector gpuDetector = new GpuDetector(new ExecutableLocator.Default());
 
         return new AdaptiveWhisperEngine(cudaBinary, cpuBinary, candidates, cpuFallbackModel, "pt", timeout,
-                preferFastModeFirst, gpuDetector);
+                false, gpuDetector);
     }
 
     /**

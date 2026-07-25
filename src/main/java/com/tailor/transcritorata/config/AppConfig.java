@@ -27,11 +27,9 @@ public final class AppConfig {
     public static final String KEY_FFMPEG_BINARY = "ffmpeg.binary";
     public static final String KEY_WHISPER_BINARY = "whisper.binary";
     public static final String KEY_WHISPER_MODEL = "whisper.model";
-    public static final String KEY_WHISPER_FAST_MODE = "whisper.fastMode";
     public static final String KEY_LAST_VIDEO_DIR = "lastVideoDir";
     public static final String KEY_OUTPUT_DIR = "outputDir";
     public static final String KEY_PROCESS_TIMEOUT_SECONDS = "process.timeoutSeconds";
-    public static final String KEY_DIARIZATION_ENABLED = "diarization.enabled";
 
     private final Properties properties = new Properties();
     private final Path configFile;
@@ -67,9 +65,7 @@ public final class AppConfig {
 
     private void applyDefaults() {
         properties.putIfAbsent(KEY_FFMPEG_BINARY, "ffmpeg");
-        properties.putIfAbsent(KEY_WHISPER_FAST_MODE, "false");
         properties.putIfAbsent(KEY_PROCESS_TIMEOUT_SECONDS, "3600");
-        properties.putIfAbsent(KEY_DIARIZATION_ENABLED, "false");
     }
 
     /**
@@ -104,15 +100,6 @@ public final class AppConfig {
         } else {
             properties.setProperty(key, value);
         }
-    }
-
-    public boolean getBoolean(String key, boolean defaultValue) {
-        String value = properties.getProperty(key);
-        return value == null ? defaultValue : Boolean.parseBoolean(value);
-    }
-
-    public void setBoolean(String key, boolean value) {
-        set(key, Boolean.toString(value));
     }
 
     public int getInt(String key, int defaultValue) {

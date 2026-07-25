@@ -53,31 +53,6 @@ final class PreferencesDialog {
             }
         });
 
-        new Label(dialog, SWT.NONE); // aligns the column with the other rows
-        Button diarizationCheckbox = new Button(dialog, SWT.CHECK);
-        diarizationCheckbox.setText("Identify participants in the transcription");
-        diarizationCheckbox.setSelection(config.getBoolean(AppConfig.KEY_DIARIZATION_ENABLED, false));
-        diarizationCheckbox.setToolTipText(
-                "Identifies participants using local AI models (without sending audio over the internet). "
-                        + "Accuracy may vary depending on the recording.");
-        GridData diarizationData = new GridData(SWT.FILL, SWT.CENTER, true, false);
-        diarizationData.horizontalSpan = 2;
-        diarizationCheckbox.setLayoutData(diarizationData);
-
-        new Label(dialog, SWT.NONE); // aligns the column with the other rows
-        Button fastModeCheckbox = new Button(dialog, SWT.CHECK);
-        fastModeCheckbox.setText("Prioritize speed and GPU memory usage (less accurate)");
-        fastModeCheckbox.setToolTipText(
-                "Uses greedy decoding (beam-size 1) instead of whisper.cpp's default (beam-size 5) from "
-                        + "the very first attempt. Faster and uses noticeably less GPU memory, at the cost of "
-                        + "a slightly less accurate transcription. Note: the app already automatically switches "
-                        + "to fast mode and/or a smaller model on its own if the GPU runs out of memory — check "
-                        + "this only if you'd rather skip straight to fast mode instead of waiting for that.");
-        fastModeCheckbox.setSelection(config.getBoolean(AppConfig.KEY_WHISPER_FAST_MODE, false));
-        GridData fastModeData = new GridData(SWT.FILL, SWT.CENTER, true, false);
-        fastModeData.horizontalSpan = 2;
-        fastModeCheckbox.setLayoutData(fastModeData);
-
         boolean[] saved = { false };
 
         Button save = new Button(dialog, SWT.PUSH);
@@ -91,8 +66,6 @@ final class PreferencesDialog {
                 config.set(AppConfig.KEY_FFMPEG_BINARY, ffmpegBinaryText.getText().trim());
                 config.set(AppConfig.KEY_WHISPER_BINARY, whisperBinaryText.getText().trim());
                 config.set(AppConfig.KEY_WHISPER_MODEL, whisperModelText.getText().trim());
-                config.setBoolean(AppConfig.KEY_DIARIZATION_ENABLED, diarizationCheckbox.getSelection());
-                config.setBoolean(AppConfig.KEY_WHISPER_FAST_MODE, fastModeCheckbox.getSelection());
 
                 config.save();
                 saved[0] = true;

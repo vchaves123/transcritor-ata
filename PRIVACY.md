@@ -13,8 +13,8 @@ third party.
 
 - **Transcription** runs locally via [whisper.cpp](https://github.com/ggml-org/whisper.cpp)
   (CPU or your own GPU).
-- **Speaker identification** (optional) runs locally via [ONNX Runtime](https://onnxruntime.ai/),
-  using models embedded in the application itself.
+- **Speaker identification** runs locally via [ONNX Runtime](https://onnxruntime.ai/), using
+  models embedded in the application itself.
 - **Minutes generation** (`.docx`) happens locally via Apache POI.
 
 No cloud AI service is used for any of this. (An earlier version of this app experimented with an

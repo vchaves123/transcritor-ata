@@ -49,7 +49,7 @@ class TranscriptionPipelineTest {
         var wavCaptor = ArgumentCaptor.forClass(Path.class);
         org.mockito.Mockito.when(engine.transcribe(wavCaptor.capture(), any(), any())).thenReturn(segments);
 
-        TranscriptionPipeline pipeline = new TranscriptionPipeline(audioExtractor, engine, docxGenerator, null, false);
+        TranscriptionPipeline pipeline = new TranscriptionPipeline(audioExtractor, engine, docxGenerator, null);
 
         List<Path> videos = List.of(Path.of("a.mp4"), Path.of("b.mp4"));
         pipeline.run(videos, outputDir, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_SLEEP_LISTENER,
@@ -69,7 +69,7 @@ class TranscriptionPipelineTest {
         org.mockito.Mockito.when(engine.transcribe(wavCaptor.capture(), any(), any()))
                 .thenThrow(new ExternalProcessException("boom", ""));
 
-        TranscriptionPipeline pipeline = new TranscriptionPipeline(audioExtractor, engine, docxGenerator, null, false);
+        TranscriptionPipeline pipeline = new TranscriptionPipeline(audioExtractor, engine, docxGenerator, null);
         List<Path> videos = List.of(Path.of("a.mp4"), Path.of("b.mp4"));
 
         assertThrows(ExternalProcessException.class, () -> pipeline.run(videos, outputDir, NO_OP_LISTENER,
@@ -87,7 +87,7 @@ class TranscriptionPipelineTest {
         org.mockito.Mockito.when(engine.transcribe(any(), any(), any()))
                 .thenThrow(new ProcessCancelledException(""));
 
-        TranscriptionPipeline pipeline = new TranscriptionPipeline(audioExtractor, engine, docxGenerator, null, false);
+        TranscriptionPipeline pipeline = new TranscriptionPipeline(audioExtractor, engine, docxGenerator, null);
         List<Path> videos = List.of(Path.of("a.mp4"), Path.of("b.mp4"));
 
         assertThrows(ProcessCancelledException.class, () -> pipeline.run(videos, outputDir, NO_OP_LISTENER,
@@ -107,7 +107,7 @@ class TranscriptionPipelineTest {
                 .diarize(any(), any(), any());
 
         ArgumentCaptor<List<AttributedSegment>> attributedCaptor = listCaptor();
-        TranscriptionPipeline pipeline = new TranscriptionPipeline(audioExtractor, engine, docxGenerator, diarizer, true);
+        TranscriptionPipeline pipeline = new TranscriptionPipeline(audioExtractor, engine, docxGenerator, diarizer);
         List<Path> videos = List.of(Path.of("a.mp4"), Path.of("b.mp4"));
 
         pipeline.run(videos, outputDir, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_SLEEP_LISTENER,

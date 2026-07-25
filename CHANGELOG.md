@@ -6,6 +6,12 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+### Changed
+- Speaker identification and beam-search (accurate) transcription are now always on. Removed the
+  "Identify participants in the transcription" and "Prioritize speed and GPU memory usage" options
+  from Preferences -- the app already automatically falls back to greedy decoding and/or a smaller
+  model on its own if the GPU runs out of memory, so the manual override was redundant.
+
 ## [1.0.15] - 2026-07-24
 
 ### Changed

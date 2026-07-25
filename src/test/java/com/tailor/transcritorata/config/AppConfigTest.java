@@ -6,7 +6,6 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AppConfigTest {
 
@@ -16,12 +15,10 @@ class AppConfigTest {
 
         AppConfig first = new AppConfig(file);
         first.set(AppConfig.KEY_WHISPER_MODEL, "C:/models/ggml-medium.bin");
-        first.setBoolean(AppConfig.KEY_WHISPER_FAST_MODE, true);
         first.save();
 
         AppConfig reloaded = new AppConfig(file);
         assertEquals("C:/models/ggml-medium.bin", reloaded.get(AppConfig.KEY_WHISPER_MODEL, null));
-        assertTrue(reloaded.getBoolean(AppConfig.KEY_WHISPER_FAST_MODE, false));
     }
 
     @Test

@@ -41,15 +41,13 @@ public final class TranscriptionPipeline {
     private final TranscriptionEngine engine;
     private final DocxMinutesGenerator docxGenerator;
     private final SpeakerDiarizer speakerDiarizer;
-    private final boolean diarizationEnabled;
 
     public TranscriptionPipeline(AudioExtractor audioExtractor, TranscriptionEngine engine,
-            DocxMinutesGenerator docxGenerator, SpeakerDiarizer speakerDiarizer, boolean diarizationEnabled) {
+            DocxMinutesGenerator docxGenerator, SpeakerDiarizer speakerDiarizer) {
         this.audioExtractor = audioExtractor;
         this.engine = engine;
         this.docxGenerator = docxGenerator;
         this.speakerDiarizer = speakerDiarizer;
-        this.diarizationEnabled = diarizationEnabled;
     }
 
     /**
@@ -94,7 +92,7 @@ public final class TranscriptionPipeline {
             Instant diarizationStart = Instant.now();
             long cpuBeforeDiarizationNanos = processCpuTimeNanos();
             List<AttributedSegment> attributed = attribute(wav, segments, handle, diarizationListener);
-            if (diarizationEnabled && speakerDiarizer != null) {
+            if (speakerDiarizer != null) {
                 reportCpuTime(diarizationListener, inProcessCpuDelta(cpuBeforeDiarizationNanos, processCpuTimeNanos()));
                 phaseWindows.add(new PhaseWindow(diarizationListener, diarizationStart, Instant.now()));
             }
@@ -255,7 +253,7 @@ public final class TranscriptionPipeline {
      */
     private List<AttributedSegment> attribute(Path wav, List<Segment> segments, ProcessRunner.Handle handle,
             ProgressListener listener) {
-        if (!diarizationEnabled || speakerDiarizer == null) {
+        if (speakerDiarizer == null) {
             return segments.stream().map(s -> new AttributedSegment(s, null)).toList();
         }
         listener.onProgress("Identifying participants...", -1);
