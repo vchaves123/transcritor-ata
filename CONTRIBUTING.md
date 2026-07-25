@@ -82,8 +82,9 @@ Releases are built and published automatically by
    git tag -a vX.Y.Z -m "..."
    git push origin vX.Y.Z
    ```
-3. The workflow compiles the jar, runs the tests, downloads ffmpeg/whisper.cpp, builds the `.msi`
-   installer, and publishes it as a GitHub Release.
+3. The workflow compiles the jar, runs the tests, builds the `.msi` installer, and publishes it as
+   a GitHub Release. ffmpeg/whisper-cli are no longer bundled -- the app downloads whichever it
+   needs itself on first run (see `ToolPackageOption.java`).
 
 See [`package-installer.ps1`](package-installer.ps1) if you need to build the installer locally
 instead (e.g. to test a packaging change before pushing a tag).

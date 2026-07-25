@@ -6,6 +6,15 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+## [1.0.15] - 2026-07-24
+
+### Changed
+- The Windows installer (`.msi`) no longer bundles ffmpeg or whisper-cli, shrinking it from
+  ~935 MB to ~150 MB. On first run, a dialog offers to download whichever of the two is missing --
+  picking the CUDA whisper-cli build only when an NVIDIA GPU is detected, so a machine without one
+  never downloads the larger CUDA build at all. Everyone who prefers to install/manage these tools
+  themselves can still do so exactly as before.
+
 ## [1.0.14] - 2026-07-24
 
 ### Changed
