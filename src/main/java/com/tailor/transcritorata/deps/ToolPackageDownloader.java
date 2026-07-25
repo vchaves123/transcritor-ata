@@ -32,7 +32,9 @@ import org.slf4j.LoggerFactory;
  * Downloads a {@link ToolPackageOption}'s zip archive (checksummed, resumable-free but
  * stall-guarded, cooperatively cancellable -- same shape as {@link WhisperModelDownloader}) and
  * extracts it into that option's own subfolder under {@code tools/}, so ffmpeg/whisper-cli can be
- * fetched on demand instead of always being bundled into the installer.
+ * fetched on demand instead of always being bundled into the installer. Also updates
+ * {@link ToolChecksumManifest}, so {@link BundledToolIntegrityChecker} still has something real to
+ * verify on later startups.
  */
 public final class ToolPackageDownloader {
 
@@ -61,6 +63,7 @@ public final class ToolPackageDownloader {
         try {
             downloadZip(option, zipFile, listener, cancelled);
             extractZip(zipFile, targetDir, option.flattenTopLevelFolder());
+            ToolChecksumManifest.updateFor(toolsDir, targetDir);
             return option.expectedExecutable(toolsDir);
         } finally {
             Files.deleteIfExists(zipFile);

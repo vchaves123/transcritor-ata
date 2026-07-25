@@ -1,6 +1,7 @@
 package com.tailor.transcritorata.gui;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.eclipse.swt.widgets.Display;
@@ -38,8 +39,13 @@ public final class MainApp {
             SplashScreen splash = SplashScreen.show(display);
 
             AppConfig config = new AppConfig();
-            runIntegrityCheckWithSplash(display, splash);
+            List<Path> corruptedTools = runIntegrityCheckWithSplash(display, splash);
             splash.close();
+
+            if (!corruptedTools.isEmpty()) {
+                IntegrityFailureDialog.show(display, corruptedTools);
+                return;
+            }
 
             ExecutableLocator locator = new ExecutableLocator.Default();
             BundledFfmpegSelector.applyIfBundlePresent(config, locator);
@@ -70,11 +76,15 @@ public final class MainApp {
      * the UI thread's event loop until it's done -- keeps the splash responsive/repainting
      * instead of freezing for the whole check, without making the check itself asynchronous with
      * respect to the rest of startup (which still waits for it, same as before).
+     *
+     * @return the tools that failed verification (empty if all matched); the caller must not
+     *         proceed to {@link MainWindow} when this is non-empty
      */
-    private static void runIntegrityCheckWithSplash(Display display, SplashScreen splash) {
+    private static List<Path> runIntegrityCheckWithSplash(Display display, SplashScreen splash) {
         AtomicBoolean done = new AtomicBoolean(false);
+        List<Path>[] result = new List[1];
         Thread.ofVirtual().start(() -> {
-            BundledToolIntegrityChecker.verify((bytesChecked, totalBytes) -> display.asyncExec(() -> {
+            result[0] = BundledToolIntegrityChecker.verify((bytesChecked, totalBytes) -> display.asyncExec(() -> {
                 if (!display.isDisposed()) {
                     splash.setProgress("Verifying installed files...", bytesChecked, totalBytes);
                 }
@@ -89,5 +99,6 @@ public final class MainApp {
                 display.sleep();
             }
         }
+        return result[0];
     }
 }
