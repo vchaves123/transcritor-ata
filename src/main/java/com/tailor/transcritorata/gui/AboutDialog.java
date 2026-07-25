@@ -16,7 +16,7 @@ import com.tailor.transcritorata.deps.AppVersion;
 
 /**
  * "About" dialog: application/version info and the licenses of every third-party component
- * shipped with the app (Java libraries in the jar, external tools bundled alongside it, and the
+ * shipped with the app (Java libraries in the jar, external tools downloaded on demand, and the
  * AI models embedded as resources).
  */
 final class AboutDialog {
@@ -125,7 +125,7 @@ final class AboutDialog {
               Eclipse Public License 1.0 / GNU LGPL 2.1 (dual-licensed)
               https://logback.qos.ch/license.html
 
-            External tools (bundled alongside the app, not inside the jar)
+            External tools (downloaded on demand, not inside the jar)
             -------------------------------------------------
             ffmpeg (static build, tools/ffmpeg)
               GNU Lesser General Public License 2.1 or later (LGPL build)

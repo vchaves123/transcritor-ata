@@ -23,9 +23,12 @@ under **Help → About transcritor-ata...**.
 | [ONNX Runtime](https://onnxruntime.ai/) (`com.microsoft.onnxruntime:onnxruntime`) | 1.27.0 | [MIT License](https://github.com/microsoft/onnxruntime/blob/main/LICENSE) |
 | [JTransforms](https://github.com/wendykierp/JTransforms) (`com.github.wendykierp:JTransforms`) | 3.2 | [BSD 2-Clause License](https://github.com/wendykierp/JTransforms) |
 | [SLF4J](https://www.slf4j.org/) (`org.slf4j:slf4j-api`) | 2.0.16 | [MIT License](https://www.slf4j.org/license.html) |
-| [Logback Classic](https://logback.qos.ch/) (`ch.qos.logback:logback-classic`) | 1.5.6 | [EPL-1.0 / LGPL-2.1](https://logback.qos.ch/license.html) (dual-licensed) |
+| [Logback Classic](https://logback.qos.ch/) (`ch.qos.logback:logback-classic`) | 1.5.18 | [EPL-1.0 / LGPL-2.1](https://logback.qos.ch/license.html) (dual-licensed) |
 
-## External tools (bundled alongside the app, not inside the jar)
+## External tools (downloaded on demand, not inside the jar)
+
+Not bundled in the installer -- downloaded automatically on first run (or manually, per the
+README's "Prerequisites" section) into `tools/` alongside the app.
 
 | Component | License |
 |---|---|

@@ -194,11 +194,12 @@ by default).
 
 - Speaker identification (diarization) is still experimental — accuracy can vary considerably
   depending on the recording. See item 4 of the prerequisites.
-- The Windows installer (`.msi`) has no wizard UI or completion screen of its own (a limitation
-  of `jpackage`'s MSI packaging) — it installs quickly and quietly, without visual confirmation
-  beyond the Start Menu/Desktop shortcuts it creates.
 - The minutes' styles are defined in code (`DocxMinutesGenerator`), without using a corporate
   `.dotx` template — the class has already been structured for this future evolution.
+- If ffmpeg or whisper-cli is downloaded once and later corrupted or modified on disk, the app
+  refuses to start and shows a "Security warning" dialog instead of silently running a
+  potentially-tampered executable. Delete the affected file (or the whole `tools/` folder) and
+  restart to re-download and re-verify it.
 
 ## Tests
 

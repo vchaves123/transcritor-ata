@@ -30,8 +30,11 @@ to run**, not sending any of your data:
 - The Whisper transcription model (`.bin`), downloaded from
   [huggingface.co/ggerganov/whisper.cpp](https://huggingface.co/ggerganov/whisper.cpp) when you
   choose one in the setup dialog or Preferences.
-- Optionally, ffmpeg and whisper-cli builds, if you follow the README's "bundled" setup
-  instructions to download them yourself.
+- ffmpeg and whisper-cli, from pinned GitHub release URLs, if a first-run dialog finds either
+  missing on your machine and you choose to download it (or manually, if you follow the README's
+  "bundled" setup instructions instead). Each download is verified against a known-good SHA-256
+  checksum before it's used; a mismatch on a later startup (e.g. local corruption) shows a
+  blocking warning instead of silently running the file.
 - On every startup, a request to GitHub's public releases API
   (`api.github.com/repos/vchaves123/transcritor-ata/releases/latest`) to check whether a newer
   version is available. This request doesn't include any of your data — it's the same as visiting
@@ -45,14 +48,15 @@ reporting service, and no account or sign-in.
 
 ## What's stored locally, and where
 
-- **Preferences** (chosen engine paths, output folder, feature toggles): plaintext properties
-  file at `%APPDATA%\transcritor-ata\config.properties`. No secrets or credentials are stored
-  there.
+- **Preferences** (chosen engine paths, output folder): plaintext properties file at
+  `%APPDATA%\transcritor-ata\config.properties`. No secrets or credentials are stored there.
 - **Logs**: `%APPDATA%\transcritor-ata\logs\`, rotated daily, kept for 14 days. These may contain
   file *names* (e.g. the video file you transcribed) for troubleshooting, but full folder paths
   are deliberately kept out of both the on-screen log panel and the log files.
-- **Downloaded models**: saved under the app's own `tools/models/` folder in your install
-  directory, not in the OS-wide model cache.
+- **Downloaded models and tools**: saved under the app's own `tools/` folder (`tools/models/`,
+  `tools/ffmpeg/`, `tools/whisper-cpu/` or `tools/whisper-cuda/`) in your install directory, not
+  in any OS-wide cache. A `tools/CHECKSUMS.sha256` file alongside them records the SHA-256 of each
+  downloaded executable, used to detect local corruption/tampering on later startups.
 
 Uninstalling the app does not automatically delete `%APPDATA%\transcritor-ata\` or the downloaded
 models folder; remove them yourself if you want a completely clean uninstall.

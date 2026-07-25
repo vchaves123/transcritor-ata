@@ -11,6 +11,12 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
   "Identify participants in the transcription" and "Prioritize speed and GPU memory usage" options
   from Preferences -- the app already automatically falls back to greedy decoding and/or a smaller
   model on its own if the GPU runs out of memory, so the manual override was redundant.
+- The bundled-tools checksum manifest (`tools/CHECKSUMS.sha256`) is now populated automatically
+  right after ffmpeg/whisper-cli are downloaded on demand, instead of only ever existing when
+  `package-installer.ps1` bundled these tools at packaging time (which no longer happens -- see
+  1.0.15 below). A confirmed checksum mismatch on startup is no longer just a log line: it now
+  shows a blocking "Security warning" dialog and refuses to start, since a tampered executable
+  would otherwise run with full code-execution capability.
 
 ## [1.0.15] - 2026-07-24
 
