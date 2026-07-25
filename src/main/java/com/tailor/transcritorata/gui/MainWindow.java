@@ -324,15 +324,6 @@ public final class MainWindow {
         Menu helpMenu = new Menu(shell, SWT.DROP_DOWN);
         helpMenuHeader.setMenu(helpMenu);
 
-        MenuItem checkInstall = new MenuItem(helpMenu, SWT.PUSH);
-        checkInstall.setText("Check installation");
-        checkInstall.addSelectionListener(new SelectionAdapter() {
-            @Override
-            public void widgetSelected(SelectionEvent e) {
-                showDependencyDialog();
-            }
-        });
-
         MenuItem javaEnvironment = new MenuItem(helpMenu, SWT.PUSH);
         javaEnvironment.setText("Java environment...");
         javaEnvironment.addSelectionListener(new SelectionAdapter() {
@@ -504,20 +495,7 @@ public final class MainWindow {
             display.asyncExec(() -> {
                 if (!shell.isDisposed()) {
                     transcribeButton.setEnabled(allOk && !selectedVideos.isEmpty());
-                    transcribeButton.setToolTipText(allOk ? null
-                            : "Missing dependencies. See Help → Check installation.");
-                }
-            });
-        });
-    }
-
-    private void showDependencyDialog() {
-        Thread.ofVirtual().start(() -> {
-            DependencyChecker checker = new DependencyChecker(config);
-            List<DependencyStatus> statuses = checker.checkAll();
-            display.asyncExec(() -> {
-                if (!shell.isDisposed()) {
-                    DependencyDialog.show(shell, statuses);
+                    transcribeButton.setToolTipText(allOk ? null : "Missing dependencies.");
                 }
             });
         });
