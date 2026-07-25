@@ -44,6 +44,7 @@ public final class MainApp {
             ExecutableLocator locator = new ExecutableLocator.Default();
             BundledFfmpegSelector.applyIfBundlePresent(config, locator);
             WhisperVariantSelector.applyBestVariant(config, new GpuDetector(locator), locator);
+            PrerequisiteSetupDialog.showIfNeeded(display, config);
             ModelSetupDialog.showIfNeeded(display, config);
 
             MainWindow window = new MainWindow(display, config);

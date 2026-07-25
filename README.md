@@ -25,6 +25,11 @@ showing links and instructions for anything that's missing. The requirements are
 
 ### 1. ffmpeg
 
+**No need to download it manually**: if ffmpeg isn't found anywhere (system PATH, configured path,
+or the `tools/ffmpeg/` folder below), the app offers to download and install it automatically the
+first time it starts, verified against a known-good checksum. Everything below is for anyone who
+prefers to install/manage it themselves instead.
+
 Required to extract audio from videos. Install via Terminal/PowerShell:
 
 ```
@@ -43,6 +48,10 @@ detects and uses that path automatically on every startup — no need to touch t
 This folder is excluded from version control (`.gitignore`).
 
 ### 2. whisper.cpp (recommended transcription engine)
+
+**No need to download it manually**: same as ffmpeg above, the app offers to download the right
+build automatically (CUDA if it detects an NVIDIA GPU, CPU otherwise) the first time it starts.
+Everything below is for anyone who prefers to install/manage it themselves instead.
 
 Download the pre-built Windows binary from the official releases:
 
@@ -136,24 +145,22 @@ For non-technical users, the recommended way to use transcritor-ata is the **Win
 (`.msi`): download it, double-click, and follow the wizard — no administrator privileges required
 (it installs for the current user only). It adds a Start Menu entry, an optional Desktop shortcut,
 and a normal "Uninstall" entry under Windows Settings → Apps. Installing a newer version
-automatically upgrades/replaces the previous one. It already includes:
+automatically upgrades/replaces the previous one. It includes:
 
 - A dedicated Java runtime (no need to have Java installed).
-- ffmpeg.
-- whisper-cli (CPU and GPU/CUDA builds — the application automatically picks the right one based
-  on your video card, on every startup).
 - Speaker identification (ONNX models embedded in the jar itself, optional).
 
-**Not included**: the Whisper transcription model (`.bin`) — on first run, a dialog lets you
-choose the size and downloads it automatically.
+**Not included** (the installer stays small by not bundling these — see "Prerequisites" above): on
+first run, a dialog offers to download ffmpeg and whisper-cli automatically (picking the CPU or
+CUDA whisper-cli build based on whether an NVIDIA GPU is detected, so a machine without one never
+downloads the larger CUDA build at all), and a separate dialog lets you choose and download a
+Whisper transcription model (`.bin`).
 
 Download the latest version from the [Releases](../../releases) tab of this repository.
 
 ### Building the installer yourself
 
-Requires JDK 21 (with `jpackage` on the PATH), Maven, the `tools/` folder already populated with
-ffmpeg and whisper-cli (see the prerequisites above — the easiest way is to run the application
-itself once, which already downloads/organizes all of this into the expected structure), and the
+Requires JDK 21 (with `jpackage` on the PATH), Maven, and the
 [WiX Toolset](https://github.com/wixtoolset/wix3/releases) 3.x (`candle.exe`/`light.exe` on PATH;
 `winget install WiXToolset.WiXToolset` also works if winget is functioning correctly):
 
@@ -161,10 +168,9 @@ itself once, which already downloads/organizes all of this into the expected str
 .\package-installer.ps1
 ```
 
-This compiles the project, generates the app image with `jpackage`, bundles the external tools
-into it, and produces `release-installer\transcritor-ata-<version>.msi`. It's not tracked in git
-(too large) — publish it as an asset of a [GitHub Release](../../releases) instead of committing
-it.
+This compiles the project, generates the app image with `jpackage`, and produces
+`release-installer\transcritor-ata-<version>.msi`. It's not tracked in git (too large) — publish it
+as an asset of a [GitHub Release](../../releases) instead of committing it.
 
 ## Importing into Eclipse
 
