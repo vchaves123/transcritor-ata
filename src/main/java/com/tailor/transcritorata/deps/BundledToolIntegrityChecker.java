@@ -49,12 +49,10 @@ public final class BundledToolIntegrityChecker {
     private BundledToolIntegrityChecker() {
     }
 
-    /** @return the bundled tools whose hash doesn't match the shipped manifest (empty if all matched). */
-    public static List<Path> verify() {
-        return verify((checked, total) -> { });
-    }
-
-    /** Same as {@link #verify()}, but also reports progress (by bytes hashed) as it goes. */
+    /**
+     * @return the bundled tools whose hash doesn't match the shipped manifest (empty if all
+     *         matched); reports progress (by bytes hashed) as it goes
+     */
     public static List<Path> verify(ProgressListener listener) {
         Path manifest = AppHome.resolve(MANIFEST_RELATIVE_PATH);
         if (!Files.isRegularFile(manifest)) {
