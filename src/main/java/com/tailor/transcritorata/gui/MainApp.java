@@ -3,6 +3,7 @@ package com.tailor.transcritorata.gui;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.swt.widgets.Display;
 
@@ -81,13 +82,13 @@ public final class MainApp {
      */
     private static List<Path> runIntegrityCheckWithSplash(Display display, SplashScreen splash) {
         AtomicBoolean done = new AtomicBoolean(false);
-        List<Path>[] result = new List[1];
+        AtomicReference<List<Path>> result = new AtomicReference<>();
         Thread.ofVirtual().start(() -> {
-            result[0] = BundledToolIntegrityChecker.verify((bytesChecked, totalBytes) -> display.asyncExec(() -> {
+            result.set(BundledToolIntegrityChecker.verify((bytesChecked, totalBytes) -> display.asyncExec(() -> {
                 if (!display.isDisposed()) {
                     splash.setProgress("Verifying installed files...", bytesChecked, totalBytes);
                 }
-            }));
+            })));
             done.set(true);
             if (!display.isDisposed()) {
                 display.wake();
@@ -98,6 +99,6 @@ public final class MainApp {
                 display.sleep();
             }
         }
-        return result[0];
+        return result.get();
     }
 }

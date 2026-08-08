@@ -10,9 +10,14 @@ import java.nio.file.Path;
  */
 public enum ToolPackageOption {
 
-    FFMPEG("ffmpeg", 146_681_779L,
-            "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-23-14-16/ffmpeg-N-125748-g80eb9e99b9-win64-lgpl.zip",
-            "c1adebb39039462f7ffdbf5d99ea1491e5203160529fc176ea639ec9e36bdbce",
+    // BtbN/FFmpeg-Builds only keeps a rolling window of recent autobuild tags -- the previous
+    // pin (autobuild-2026-07-23-14-16) started 404ing once BtbN pruned it, roughly two weeks
+    // after it was pinned. Whoever re-pins this next should expect the same: grab the current
+    // latest autobuild tag/asset from https://github.com/BtbN/FFmpeg-Builds/releases, download it,
+    // and compute its own SHA-256 -- don't reuse an old tag's URL once it's gone.
+    FFMPEG("ffmpeg", 148_274_234L,
+            "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-07-13-13/ffmpeg-N-125990-g5c395992f9-win64-lgpl.zip",
+            "c7ae39256aacd89a1204d62293f0da6c6623497684117844aaec758c59729673",
             "ffmpeg",
             // The BtbN zip wraps everything in a single version-named folder; this strips that one
             // top-level folder so ffmpeg.exe ends up directly at tools/ffmpeg/bin/ffmpeg.exe.
