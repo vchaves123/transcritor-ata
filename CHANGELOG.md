@@ -6,6 +6,19 @@ All notable changes to transcritor-ata are documented here. Format loosely follo
 
 ## [Unreleased]
 
+## [1.0.17] - 2026-08-08
+
+### Added
+- The "Add..." file dialog now also accepts audio files (`.wav`, `.mp3`, `.m4a`, `.flac`), not
+  just video containers, plus `.mov`.
+- A new checkbox lets multiple selected files be transcribed individually -- each on its own
+  timeline, instead of concatenated into one recording. The resulting minutes document gets an
+  index page (file name + duration, each a clickable link) followed by one section per file.
+
+### Fixed
+- The pinned ffmpeg download URL started returning HTTP 404 once BtbN/FFmpeg-Builds pruned that
+  autobuild tag; re-pinned to a current one.
+
 ## [1.0.16] - 2026-07-25
 
 ### Changed
