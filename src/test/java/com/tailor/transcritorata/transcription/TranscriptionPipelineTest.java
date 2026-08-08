@@ -52,8 +52,8 @@ class TranscriptionPipelineTest {
         TranscriptionPipeline pipeline = new TranscriptionPipeline(audioExtractor, engine, docxGenerator, null);
 
         List<Path> videos = List.of(Path.of("a.mp4"), Path.of("b.mp4"));
-        pipeline.run(videos, outputDir, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_SLEEP_LISTENER,
-                new ProcessRunner.Handle());
+        pipeline.run(videos, outputDir, false, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER,
+                NO_OP_SLEEP_LISTENER, new ProcessRunner.Handle());
 
         Path tempDir = wavCaptor.getValue().getParent();
         assertFalse(Files.exists(tempDir), "the per-run temp directory must be cleaned up after success");
@@ -72,7 +72,7 @@ class TranscriptionPipelineTest {
         TranscriptionPipeline pipeline = new TranscriptionPipeline(audioExtractor, engine, docxGenerator, null);
         List<Path> videos = List.of(Path.of("a.mp4"), Path.of("b.mp4"));
 
-        assertThrows(ExternalProcessException.class, () -> pipeline.run(videos, outputDir, NO_OP_LISTENER,
+        assertThrows(ExternalProcessException.class, () -> pipeline.run(videos, outputDir, false, NO_OP_LISTENER,
                 NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_SLEEP_LISTENER, new ProcessRunner.Handle()));
 
         Path tempDir = wavCaptor.getValue().getParent();
@@ -90,7 +90,7 @@ class TranscriptionPipelineTest {
         TranscriptionPipeline pipeline = new TranscriptionPipeline(audioExtractor, engine, docxGenerator, null);
         List<Path> videos = List.of(Path.of("a.mp4"), Path.of("b.mp4"));
 
-        assertThrows(ProcessCancelledException.class, () -> pipeline.run(videos, outputDir, NO_OP_LISTENER,
+        assertThrows(ProcessCancelledException.class, () -> pipeline.run(videos, outputDir, false, NO_OP_LISTENER,
                 NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_SLEEP_LISTENER, new ProcessRunner.Handle()));
     }
 
@@ -110,14 +110,95 @@ class TranscriptionPipelineTest {
         TranscriptionPipeline pipeline = new TranscriptionPipeline(audioExtractor, engine, docxGenerator, diarizer);
         List<Path> videos = List.of(Path.of("a.mp4"), Path.of("b.mp4"));
 
-        pipeline.run(videos, outputDir, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_SLEEP_LISTENER,
-                new ProcessRunner.Handle());
+        pipeline.run(videos, outputDir, false, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER,
+                NO_OP_SLEEP_LISTENER, new ProcessRunner.Handle());
 
         verify(docxGenerator).generateSimpleMinutesAttributed(any(Path.class), any(MeetingMetadata.class),
                 attributedCaptor.capture());
         List<AttributedSegment> attributed = attributedCaptor.getValue();
         assertEquals(1, attributed.size());
         assertNull(attributed.get(0).speakerLabel(), "a failed diarization must fall back to no speaker labels");
+    }
+
+    @Test
+    void transcribingIndividuallyProducesOneFileTranscriptPerSourceFileOnItsOwnTimeline() throws Exception {
+        AudioExtractor audioExtractor = mock(AudioExtractor.class);
+        TranscriptionEngine engine = mock(TranscriptionEngine.class);
+        DocxMinutesGenerator docxGenerator = mock(DocxMinutesGenerator.class);
+
+        List<Segment> segmentsA = List.of(new Segment(Duration.ZERO, Duration.ofSeconds(3), "from a"));
+        List<Segment> segmentsB = List.of(new Segment(Duration.ZERO, Duration.ofSeconds(7), "from b"));
+        var wavCaptor = ArgumentCaptor.forClass(Path.class);
+        org.mockito.Mockito.when(engine.transcribe(wavCaptor.capture(), any(), any()))
+                .thenReturn(segmentsA, segmentsB);
+
+        ArgumentCaptor<List<com.tailor.transcritorata.model.FileTranscript>> fileTranscriptsCaptor = listCaptor();
+        TranscriptionPipeline pipeline = new TranscriptionPipeline(audioExtractor, engine, docxGenerator, null);
+        List<Path> videos = List.of(Path.of("a.mp4"), Path.of("b.mp4"));
+        Path outputDir = Files.createTempDirectory("transcritor-ata-test-");
+
+        try {
+            pipeline.run(videos, outputDir, true, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER,
+                    NO_OP_SLEEP_LISTENER, new ProcessRunner.Handle());
+
+            verify(docxGenerator).generateMultiFileMinutes(any(Path.class), any(MeetingMetadata.class),
+                    fileTranscriptsCaptor.capture());
+            List<com.tailor.transcritorata.model.FileTranscript> fileTranscripts = fileTranscriptsCaptor.getValue();
+
+            assertEquals(2, fileTranscripts.size());
+            assertEquals("a.mp4", fileTranscripts.get(0).fileName());
+            assertEquals(Duration.ofSeconds(3), fileTranscripts.get(0).duration());
+            assertEquals("from a", fileTranscripts.get(0).segments().get(0).segment().text());
+            assertEquals("b.mp4", fileTranscripts.get(1).fileName());
+            assertEquals(Duration.ofSeconds(7), fileTranscripts.get(1).duration());
+            assertEquals("from b", fileTranscripts.get(1).segments().get(0).segment().text());
+        } finally {
+            deleteRecursivelyForTest(outputDir);
+        }
+    }
+
+    @Test
+    void transcribingIndividuallyWithOnlyOneFileFallsBackToTheConcatenatedGenerator() throws Exception {
+        AudioExtractor audioExtractor = mock(AudioExtractor.class);
+        TranscriptionEngine engine = mock(TranscriptionEngine.class);
+        DocxMinutesGenerator docxGenerator = mock(DocxMinutesGenerator.class);
+
+        List<Segment> segments = List.of(new Segment(Duration.ZERO, Duration.ofSeconds(1), "hi"));
+        org.mockito.Mockito.when(engine.transcribe(any(), any(), any())).thenReturn(segments);
+        // The single-file branch of extractAndConcatenate does a real Files.move() of the
+        // extracted wav (unlike the multi-file branch, whose concatenate() call is mocked out
+        // entirely) -- so the mock must actually create that file for this real IO to succeed.
+        org.mockito.Mockito.doAnswer(invocation -> {
+            Files.createFile(invocation.getArgument(1));
+            return null;
+        }).when(audioExtractor).extractToWav(any(), any(), any(), any());
+
+        TranscriptionPipeline pipeline = new TranscriptionPipeline(audioExtractor, engine, docxGenerator, null);
+        List<Path> videos = List.of(Path.of("a.mp4"));
+        Path outputDir = Files.createTempDirectory("transcritor-ata-test-");
+
+        try {
+            // transcribeIndividually=true is a no-op with a single file: nothing to separate into
+            // its own section that concatenation wouldn't already produce identically.
+            pipeline.run(videos, outputDir, true, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER, NO_OP_LISTENER,
+                    NO_OP_SLEEP_LISTENER, new ProcessRunner.Handle());
+
+            verify(docxGenerator).generateSimpleMinutesAttributed(any(Path.class), any(MeetingMetadata.class), any());
+        } finally {
+            deleteRecursivelyForTest(outputDir);
+        }
+    }
+
+    private static void deleteRecursivelyForTest(Path dir) throws java.io.IOException {
+        try (var stream = Files.walk(dir)) {
+            stream.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (java.io.IOException ignored) {
+                    // best-effort cleanup
+                }
+            });
+        }
     }
 
     /** Isolates the single unchecked cast Mockito's raw-typed {@code ArgumentCaptor.forClass(List.class)} requires. */

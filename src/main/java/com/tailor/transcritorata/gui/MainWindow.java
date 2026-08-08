@@ -68,6 +68,7 @@ public final class MainWindow {
     private Label outputDirLabel;
     private Button outputDirButton;
     private MenuItem preferencesMenuItem;
+    private Button transcribeIndividuallyCheckbox;
     private Button transcribeButton;
     private Button cancelButton;
     private Label elapsedTimeLabel;
@@ -166,7 +167,7 @@ public final class MainWindow {
 
     private void buildFileListSection() {
         Label filesLabel = new Label(shell, SWT.NONE);
-        filesLabel.setText("Video files (in the order they will be concatenated):");
+        filesLabel.setText("Video/audio files, in this order:");
 
         Composite filesRow = new Composite(shell, SWT.NONE);
         GridLayout filesRowLayout = new GridLayout(2, false);
@@ -233,6 +234,12 @@ public final class MainWindow {
 
         totalsLabel = new Label(shell, SWT.NONE);
         totalsLabel.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+
+        transcribeIndividuallyCheckbox = new Button(shell, SWT.CHECK);
+        transcribeIndividuallyCheckbox.setText(
+                "Transcribe each file individually (index page with links) instead of concatenating them");
+        transcribeIndividuallyCheckbox.setSelection(false);
+        transcribeIndividuallyCheckbox.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
 
         Composite outputDirRow = new Composite(shell, SWT.NONE);
         GridLayout outputDirLayout = new GridLayout(2, false);
@@ -347,7 +354,8 @@ public final class MainWindow {
 
     private void addVideoFiles() {
         FileDialog fileDialog = new FileDialog(shell, SWT.OPEN | SWT.MULTI);
-        fileDialog.setFilterExtensions(new String[] { "*.wmv;*.mp4;*.mkv;*.avi" });
+        fileDialog.setFilterExtensions(
+                new String[] { "*.wmv;*.mp4;*.mkv;*.avi;*.mov;*.wav;*.mp3;*.m4a;*.flac" });
         fileDialog.setFilterPath(config.get(AppConfig.KEY_LAST_VIDEO_DIR, ""));
         String chosen = fileDialog.open();
         if (chosen == null) {
@@ -507,6 +515,7 @@ public final class MainWindow {
         }
 
         List<Path> videos = selectedVideos.stream().map(VideoFileInfo::path).toList();
+        boolean transcribeIndividually = transcribeIndividuallyCheckbox.getSelection();
 
         setControlsEnabledWhileBusy(true);
         audioSection.clear();
@@ -523,7 +532,7 @@ public final class MainWindow {
         ProcessRunner.Handle handle = new ProcessRunner.Handle();
         currentHandle = handle;
 
-        Thread.ofVirtual().start(() -> runPipeline(handle, videos));
+        Thread.ofVirtual().start(() -> runPipeline(handle, videos, transcribeIndividually));
     }
 
     private void cancelTranscription() {
@@ -553,6 +562,7 @@ public final class MainWindow {
     private void setControlsEnabledWhileBusy(boolean busy) {
         fileListWidget.setEnabled(!busy);
         addButton.setEnabled(!busy);
+        transcribeIndividuallyCheckbox.setEnabled(!busy);
         outputDirButton.setEnabled(!busy);
         preferencesMenuItem.setEnabled(!busy);
         cancelButton.setEnabled(busy);
@@ -601,14 +611,14 @@ public final class MainWindow {
         elapsedTimerActive = false;
     }
 
-    private void runPipeline(ProcessRunner.Handle handle, List<Path> videos) {
+    private void runPipeline(ProcessRunner.Handle handle, List<Path> videos, boolean transcribeIndividually) {
         try {
             TranscriptionPipeline pipeline = buildPipeline();
             Path outputDir = resolveOutputDir(videos);
             // percent == -1 is the sentinel used by the engines/ffmpeg for "just a log line"
             // (raw process output, transcribed sentences as they are recognized, etc.), which
             // should not move the phase's progress indicator.
-            PipelineResult result = pipeline.run(videos, outputDir,
+            PipelineResult result = pipeline.run(videos, outputDir, transcribeIndividually,
                     (message, percent) -> display.asyncExec(() -> reportPhaseProgress(audioSection, message, percent)),
                     (message, percent) -> display
                             .asyncExec(() -> reportPhaseProgress(transcriptionSection, message, percent)),

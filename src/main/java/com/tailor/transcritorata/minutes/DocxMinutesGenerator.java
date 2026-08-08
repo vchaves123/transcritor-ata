@@ -2,6 +2,7 @@ package com.tailor.transcritorata.minutes;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.math.BigInteger;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,6 +11,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
+import org.apache.poi.xwpf.usermodel.UnderlinePatterns;
 import org.apache.poi.xwpf.model.XWPFHeaderFooterPolicy;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
@@ -19,6 +21,7 @@ import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STFldCharType;
 
 import com.tailor.transcritorata.model.AttributedSegment;
+import com.tailor.transcritorata.model.FileTranscript;
 import com.tailor.transcritorata.model.Segment;
 
 /**
@@ -51,6 +54,43 @@ public final class DocxMinutesGenerator {
             addTranscription(document, segments);
             write(document, outputPath);
         }
+    }
+
+    /**
+     * Generates minutes for several source files transcribed individually (each on its own
+     * 00:00-based timeline, never concatenated): title, metadata table, an index page listing
+     * every file with a clickable link, then each file's own section -- in the same order -- with
+     * its transcription. Each index entry jumps straight to its file's section heading via an
+     * internal Word bookmark/hyperlink pair, since a same-document jump has no dedicated
+     * high-level POI API (unlike the external hyperlinks {@code createHyperlinkRun} supports).
+     */
+    public void generateMultiFileMinutes(Path outputPath, MeetingMetadata metadata,
+            List<FileTranscript> fileTranscripts) throws IOException {
+        try (XWPFDocument document = new XWPFDocument()) {
+            applyHeaderFooter(document);
+            addTitle(document, "Meeting Minutes");
+            addMetadataTable(document, metadata);
+
+            addSectionHeading(document, "Index");
+            for (int i = 0; i < fileTranscripts.size(); i++) {
+                FileTranscript fileTranscript = fileTranscripts.get(i);
+                String durationText = fileTranscript.duration() != null ? Segment.format(fileTranscript.duration()) : "-";
+                addIndexEntry(document, bookmarkNameFor(i),
+                        (i + 1) + ". " + fileTranscript.fileName() + " (" + durationText + ")");
+            }
+
+            for (int i = 0; i < fileTranscripts.size(); i++) {
+                FileTranscript fileTranscript = fileTranscripts.get(i);
+                addFileSectionHeading(document, bookmarkNameFor(i), i, fileTranscript.fileName());
+                addTranscription(document, fileTranscript.segments());
+            }
+
+            write(document, outputPath);
+        }
+    }
+
+    private static String bookmarkNameFor(int fileIndex) {
+        return "transcritorAtaFile" + fileIndex;
     }
 
     private void applyHeaderFooter(XWPFDocument document) {
@@ -112,6 +152,63 @@ public final class DocxMinutesGenerator {
         run.setFontFamily(FONT_FAMILY);
         run.setFontSize(TITLE_SIZE);
         run.setColor(ACCENT_COLOR);
+    }
+
+    /**
+     * A section heading with a Word bookmark wrapped around its run, so an index entry elsewhere
+     * in the document can jump straight to it. {@code bookmarkStart}/{@code bookmarkEnd} must
+     * bracket the run(s) they name -- calling {@code addNewBookmarkStart()} before creating the
+     * run and {@code addNewBookmarkEnd()} after appends them in that document order, per how
+     * {@link XWPFParagraph#createRun()} itself appends to the same underlying paragraph XML.
+     */
+    private void addFileSectionHeading(XWPFDocument document, String bookmarkName, int bookmarkId, String text) {
+        XWPFParagraph paragraph = document.createParagraph();
+        paragraph.setSpacingBefore(200);
+        paragraph.setSpacingAfter(120);
+
+        var bookmarkStart = paragraph.getCTP().addNewBookmarkStart();
+        bookmarkStart.setName(bookmarkName);
+        bookmarkStart.setId(BigInteger.valueOf(bookmarkId));
+
+        XWPFRun run = paragraph.createRun();
+        run.setText(text);
+        run.setBold(true);
+        run.setFontFamily(FONT_FAMILY);
+        run.setFontSize(SECTION_HEADING_SIZE);
+        run.setColor(ACCENT_COLOR);
+
+        paragraph.getCTP().addNewBookmarkEnd().setId(BigInteger.valueOf(bookmarkId));
+    }
+
+    /**
+     * An index entry: an internal {@code HYPERLINK \l "bookmarkName"} field (begin/instrText/
+     * separate/end runs, same OOXML field convention as {@link #addPageNumberField}) wrapping a
+     * visible, underlined display run -- clicking it in Word jumps to the matching bookmark added
+     * by {@link #addFileSectionHeading}.
+     */
+    private void addIndexEntry(XWPFDocument document, String bookmarkName, String displayText) {
+        XWPFParagraph paragraph = document.createParagraph();
+        paragraph.setSpacingAfter(80);
+        paragraph.setIndentationLeft(240);
+
+        XWPFRun beginRun = paragraph.createRun();
+        beginRun.getCTR().addNewFldChar().setFldCharType(STFldCharType.BEGIN);
+
+        XWPFRun instrRun = paragraph.createRun();
+        instrRun.getCTR().addNewInstrText().setStringValue("HYPERLINK \\l \"" + bookmarkName + "\"");
+
+        XWPFRun separateRun = paragraph.createRun();
+        separateRun.getCTR().addNewFldChar().setFldCharType(STFldCharType.SEPARATE);
+
+        XWPFRun displayRun = paragraph.createRun();
+        displayRun.setText(displayText);
+        displayRun.setColor("0563C1");
+        displayRun.setUnderline(UnderlinePatterns.SINGLE);
+        displayRun.setFontFamily(FONT_FAMILY);
+        displayRun.setFontSize(BODY_SIZE);
+
+        XWPFRun endRun = paragraph.createRun();
+        endRun.getCTR().addNewFldChar().setFldCharType(STFldCharType.END);
     }
 
     private void addSectionHeading(XWPFDocument document, String text) {

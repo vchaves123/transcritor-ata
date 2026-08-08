@@ -30,11 +30,15 @@ import com.tailor.transcritorata.diarization.SpeakerTurn;
 import com.tailor.transcritorata.minutes.DocxMinutesGenerator;
 import com.tailor.transcritorata.minutes.MeetingMetadata;
 import com.tailor.transcritorata.model.AttributedSegment;
+import com.tailor.transcritorata.model.FileTranscript;
 import com.tailor.transcritorata.model.Segment;
 
 /**
- * Orchestrates the full pipeline: audio extraction from one or more source files (concatenated
- * in the given order), transcription, and minutes generation.
+ * Orchestrates the full pipeline: audio extraction from one or more source files, transcription,
+ * and minutes generation. Multiple source files are handled in one of two mutually exclusive
+ * ways (see {@link #run}'s {@code transcribeIndividually} parameter): concatenated into a single
+ * timeline (the original behavior), or transcribed individually into their own self-contained
+ * sections of one minutes document, linked from an index page.
  */
 public final class TranscriptionPipeline {
 
@@ -54,16 +58,23 @@ public final class TranscriptionPipeline {
     }
 
     /**
-     * @param videoFiles            source files, in the order they should be concatenated
+     * @param videoFiles            source files, in the order they should be concatenated (or, when
+     *                              {@code transcribeIndividually} is true, listed in the index)
+     * @param transcribeIndividually when true and there's more than one source file, each file is
+     *                              transcribed on its own timeline into its own section of the
+     *                              output document instead of being concatenated into one; ignored
+     *                              (concatenation and individual transcription are identical) when
+     *                              there's only one file
      * @param audioListener         receives progress/log lines for the audio extraction phase (per
-     *                              source file, plus the concatenation step when there's more than one)
+     *                              source file, plus the concatenation step when there's more than
+     *                              one and {@code transcribeIndividually} is false)
      * @param transcriptionListener receives progress/log lines for the transcription engine
      * @param diarizationListener   receives progress/log lines for the (optional) diarization step
      * @param minutesListener       receives progress/log lines for minutes generation (docx)
      * @param totalSleepListener    receives the combined suspended time across every phase (zero if
      *                              none), once the whole run ends -- regardless of how it ended
      */
-    public PipelineResult run(List<Path> videoFiles, Path outputDir,
+    public PipelineResult run(List<Path> videoFiles, Path outputDir, boolean transcribeIndividually,
             ProgressListener audioListener, ProgressListener transcriptionListener,
             ProgressListener diarizationListener, ProgressListener minutesListener,
             Consumer<Duration> totalSleepListener,
@@ -71,6 +82,20 @@ public final class TranscriptionPipeline {
         if (videoFiles.isEmpty()) {
             throw new IllegalArgumentException("No video file selected.");
         }
+        if (transcribeIndividually && videoFiles.size() > 1) {
+            return runIndividually(videoFiles, outputDir, audioListener, transcriptionListener, diarizationListener,
+                    minutesListener, totalSleepListener, handle);
+        }
+        return runConcatenated(videoFiles, outputDir, audioListener, transcriptionListener, diarizationListener,
+                minutesListener, totalSleepListener, handle);
+    }
+
+    /** The original behavior: every source file concatenated into one timeline before a single transcription pass. */
+    private PipelineResult runConcatenated(List<Path> videoFiles, Path outputDir,
+            ProgressListener audioListener, ProgressListener transcriptionListener,
+            ProgressListener diarizationListener, ProgressListener minutesListener,
+            Consumer<Duration> totalSleepListener,
+            ProcessRunner.Handle handle) throws ExternalProcessException, IOException, InterruptedException {
         Path tempDir = Files.createTempDirectory("transcritor-ata-");
         List<PhaseWindow> phaseWindows = new ArrayList<>();
         try {
@@ -112,6 +137,106 @@ public final class TranscriptionPipeline {
             minutesListener.onProgress("Generating minutes...", 50);
             Path simpleMinutes = outputDir.resolve(baseName + "-minutes.docx");
             docxGenerator.generateSimpleMinutesAttributed(simpleMinutes, metadata, attributed);
+            reportCpuTime(minutesListener, inProcessCpuDelta(cpuBeforeMinutesNanos, processCpuTimeNanos()));
+            phaseWindows.add(new PhaseWindow(minutesListener, minutesStart, Instant.now()));
+
+            minutesListener.onProgress("Complete", 100);
+            return new PipelineResult(simpleMinutes);
+        } finally {
+            reportSleepIntervalsPerPhase(phaseWindows, totalSleepListener);
+            deleteRecursively(tempDir);
+        }
+    }
+
+    /**
+     * Transcribes each source file on its own timeline (starting at 00:00, never concatenated
+     * with another file's audio) and combines the results into one minutes document with an
+     * index page linking to each file's own section -- see {@link DocxMinutesGenerator#generateMultiFileMinutes}.
+     */
+    private PipelineResult runIndividually(List<Path> videoFiles, Path outputDir,
+            ProgressListener audioListener, ProgressListener transcriptionListener,
+            ProgressListener diarizationListener, ProgressListener minutesListener,
+            Consumer<Duration> totalSleepListener,
+            ProcessRunner.Handle handle) throws ExternalProcessException, IOException, InterruptedException {
+        Path tempDir = Files.createTempDirectory("transcritor-ata-");
+        List<PhaseWindow> phaseWindows = new ArrayList<>();
+        try {
+            List<FileTranscript> fileTranscripts = new ArrayList<>(videoFiles.size());
+
+            Instant audioWindowStart = Instant.now();
+            Instant audioWindowEnd = audioWindowStart;
+            Instant transcriptionWindowStart = null;
+            Instant transcriptionWindowEnd = null;
+            Instant diarizationWindowStart = null;
+            Instant diarizationWindowEnd = null;
+            Duration audioCpuTotal = Duration.ZERO;
+            Duration transcriptionCpuTotal = Duration.ZERO;
+            Duration diarizationCpuTotal = Duration.ZERO;
+
+            for (int i = 0; i < videoFiles.size(); i++) {
+                Path videoFile = videoFiles.get(i);
+                int fileNumber = i + 1;
+                String fileLabel = videoFile.getFileName().toString();
+
+                Duration cpuBeforeAudio = handle.cpuTimeUsed();
+                audioListener.onProgress(
+                        "Extracting audio from file %d of %d (%s)...".formatted(fileNumber, videoFiles.size(), fileLabel),
+                        (int) ((i * 100.0) / videoFiles.size()));
+                Path wav = tempDir.resolve("audio-" + i + ".wav");
+                audioExtractor.extractToWav(videoFile, wav, handle, line -> audioListener.onProgress(line, -1));
+                audioCpuTotal = audioCpuTotal.plus(handle.cpuTimeUsed().minus(cpuBeforeAudio));
+                audioWindowEnd = Instant.now();
+
+                if (transcriptionWindowStart == null) {
+                    transcriptionWindowStart = Instant.now();
+                }
+                Duration cpuBeforeTranscription = handle.cpuTimeUsed();
+                transcriptionListener.onProgress(
+                        "Transcribing file %d of %d (%s)...".formatted(fileNumber, videoFiles.size(), fileLabel), -1);
+                List<Segment> segments = engine.transcribe(wav,
+                        (msg, pct) -> transcriptionListener.onProgress(msg, pct), handle);
+                transcriptionCpuTotal = transcriptionCpuTotal.plus(handle.cpuTimeUsed().minus(cpuBeforeTranscription));
+                transcriptionWindowEnd = Instant.now();
+
+                if (diarizationWindowStart == null) {
+                    diarizationWindowStart = Instant.now();
+                }
+                long cpuBeforeDiarizationNanos = processCpuTimeNanos();
+                List<AttributedSegment> attributed = attribute(wav, segments, handle, diarizationListener);
+                if (speakerDiarizer != null) {
+                    diarizationCpuTotal = diarizationCpuTotal
+                            .plus(inProcessCpuDelta(cpuBeforeDiarizationNanos, processCpuTimeNanos()));
+                }
+                diarizationWindowEnd = Instant.now();
+
+                Duration fileDuration = segments.isEmpty() ? Duration.ZERO : segments.get(segments.size() - 1).end();
+                fileTranscripts.add(new FileTranscript(fileLabel, fileDuration, attributed));
+                Files.deleteIfExists(wav);
+            }
+
+            audioListener.onProgress("Audio extraction complete.", 100);
+            reportCpuTime(audioListener, audioCpuTotal);
+            phaseWindows.add(new PhaseWindow(audioListener, audioWindowStart, audioWindowEnd));
+
+            transcriptionListener.onProgress("Transcription complete.", 100);
+            reportCpuTime(transcriptionListener, transcriptionCpuTotal);
+            phaseWindows.add(new PhaseWindow(transcriptionListener, transcriptionWindowStart, transcriptionWindowEnd));
+
+            if (speakerDiarizer != null) {
+                reportCpuTime(diarizationListener, diarizationCpuTotal);
+                phaseWindows.add(new PhaseWindow(diarizationListener, diarizationWindowStart, diarizationWindowEnd));
+            }
+
+            String baseName = stripExtension(videoFiles.get(0).getFileName().toString());
+            Duration totalDuration = fileTranscripts.stream().map(FileTranscript::duration)
+                    .reduce(Duration.ZERO, Duration::plus);
+            MeetingMetadata metadata = new MeetingMetadata(LocalDate.now(), sourceFileNames(videoFiles), totalDuration);
+
+            Instant minutesStart = Instant.now();
+            long cpuBeforeMinutesNanos = processCpuTimeNanos();
+            minutesListener.onProgress("Generating minutes...", 50);
+            Path simpleMinutes = outputDir.resolve(baseName + "-minutes.docx");
+            docxGenerator.generateMultiFileMinutes(simpleMinutes, metadata, fileTranscripts);
             reportCpuTime(minutesListener, inProcessCpuDelta(cpuBeforeMinutesNanos, processCpuTimeNanos()));
             phaseWindows.add(new PhaseWindow(minutesListener, minutesStart, Instant.now()));
 
