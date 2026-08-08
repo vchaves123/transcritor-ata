@@ -129,8 +129,12 @@ class TranscriptionPipelineTest {
         List<Segment> segmentsA = List.of(new Segment(Duration.ZERO, Duration.ofSeconds(3), "from a"));
         List<Segment> segmentsB = List.of(new Segment(Duration.ZERO, Duration.ofSeconds(7), "from b"));
         var wavCaptor = ArgumentCaptor.forClass(Path.class);
+        // Two separate thenReturn() calls instead of the varargs overload
+        // (.thenReturn(segmentsA, segmentsB)): that overload is generic-varargs (T...) and
+        // List<Segment> is itself generic, which triggers an unchecked "generic array creation"
+        // warning.
         org.mockito.Mockito.when(engine.transcribe(wavCaptor.capture(), any(), any()))
-                .thenReturn(segmentsA, segmentsB);
+                .thenReturn(segmentsA).thenReturn(segmentsB);
 
         ArgumentCaptor<List<com.tailor.transcritorata.model.FileTranscript>> fileTranscriptsCaptor = listCaptor();
         TranscriptionPipeline pipeline = new TranscriptionPipeline(audioExtractor, engine, docxGenerator, null);

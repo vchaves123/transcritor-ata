@@ -142,6 +142,39 @@
 
   <build>
     <finalName>${project.artifactId}</finalName>
+    <pluginManagement>
+      <plugins>
+        <!-- Tells Eclipse's m2e to ignore the maven-shade-plugin execution below during its own
+             incremental builds (it has no built-in lifecycle mapping for the "shade" goal, which
+             otherwise surfaces as a "Maven Configuration Problem" against this pom). Only m2e
+             reads this; command-line Maven builds (mvn package, the release workflow, etc.) are
+             unaffected either way. -->
+        <plugin>
+          <groupId>org.eclipse.m2e</groupId>
+          <artifactId>lifecycle-mapping</artifactId>
+          <version>1.0.0</version>
+          <configuration>
+            <lifecycleMappingMetadata>
+              <pluginExecutions>
+                <pluginExecution>
+                  <pluginExecutionFilter>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-shade-plugin</artifactId>
+                    <versionRange>[3.6.0,)</versionRange>
+                    <goals>
+                      <goal>shade</goal>
+                    </goals>
+                  </pluginExecutionFilter>
+                  <action>
+                    <ignore/>
+                  </action>
+                </pluginExecution>
+              </pluginExecutions>
+            </lifecycleMappingMetadata>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
